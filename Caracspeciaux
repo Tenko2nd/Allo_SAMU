@@ -1,0 +1,31 @@
+import re
+
+def nettoyer_texte(texte):
+    """ Supprime les caractères spéciaux en ne gardant que les lettres, chiffres et espaces. """
+    return re.sub(r'[^A-Za-z0-9\s]', '', texte)
+
+def traiter_fichier(nom_fichier_entree, nom_fichier_sortie):
+    try:
+        # Lire le contenu du fichier
+        with open(D12_2023246895-4919477_2023-09-17_19-50-12_2023-09-17_19-51-34_Entrant.mp3, 'r', encoding='utf-8') as fichier_entree:
+            texte = fichier_entree.read()
+
+        # Nettoyer le texte
+        texte_nettoye = nettoyer_texte(texte)
+
+        # Enregistrer le texte nettoyé dans un nouveau fichier
+        with open(nom_fichier_sortie, 'w', encoding='utf-8') as fichier_sortie:
+            fichier_sortie.write(texte_nettoye)
+
+        print(f"Le fichier nettoyé a été enregistré sous : {nom_fichier_sortie}")
+
+    except FileNotFoundError:
+        print("Erreur : Le fichier d'entrée n'existe pas.")
+    except Exception as e:
+        print(f"Une erreur s'est produite : {e}")
+
+# Exemple d'utilisation
+nom_fichier_entree = "texte_brut.txt"  # Remplace par le nom de ton fichier d'entrée
+nom_fichier_sortie = "texte_nettoye.txt"  # Nom du fichier de sortie
+
+traiter_fichier(nom_fichier_entree, nom_fichier_sortie)
