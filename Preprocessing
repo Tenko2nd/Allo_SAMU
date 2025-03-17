@@ -3,7 +3,7 @@ import re
 import unicodedata
 from docx import Document
 
-# Dictionnaire des contractions courantes en français
+
 contractions_fr = {
     r"\bj'ai\b": "je ai",
     r"\bt'as\b": "tu as",
@@ -23,14 +23,12 @@ contractions_fr = {
 
 
 def normaliser_contractions(texte):
-    """Remplace les contractions par leur forme complète."""
     for contraction, forme_complete in contractions_fr.items():
         texte = re.sub(contraction, forme_complete, texte, flags=re.IGNORECASE)
     return texte
 
 
 def nettoyer_texte(texte):
-    """Supprime les accents et les caractères spéciaux du texte."""
     texte = unicodedata.normalize('NFD', texte)  # Normalisation Unicode
     texte = ''.join(c for c in texte if unicodedata.category(c) != 'Mn')  # Supprime les accents
     texte = normaliser_contractions(texte)  # Normalise les contractions
@@ -39,7 +37,6 @@ def nettoyer_texte(texte):
 
 
 def lire_stopwords(stopwords_path):
-    """Lit les stop words depuis un fichier Word et les retourne sous forme de liste."""
     doc = Document(stopwords_path)
     stopwords = []
     for para in doc.paragraphs:
@@ -48,7 +45,6 @@ def lire_stopwords(stopwords_path):
 
 
 def supprimer_stopwords(texte, stopwords):
-    """Supprime les stop words du texte tout en conservant les sauts de ligne."""
     lignes = texte.split('\n')  # Sépare le texte en lignes
     lignes_filtrees = []
     for ligne in lignes:
@@ -60,7 +56,6 @@ def supprimer_stopwords(texte, stopwords):
 
 
 def traiter_fichier_word(input_path, output_path, stopwords_path):
-    """Ouvre un fichier Word, nettoie son texte, supprime les stop words et enregistre un nouveau fichier."""
     try:
         # Vérifier si le fichier d'entrée existe
         if not os.path.exists(input_path):
