@@ -3,8 +3,8 @@ import re
 import spacy
 
 # Ouvre le document
-docsPath = r"C:\Projet_synthèse\Data\Retranscriptions_anonymes/"
-record_ID = "A1_2023002752-3445953_2023-01-03_15-54-29_2023-01-03_15-55-57_Entrant.mp3.docx"
+docsPath = r"Test\Ressources"
+record_ID = "test.docx"
 doc = docx.Document(docsPath+record_ID)
 
 # Ouvre le modèle de SpaCy
