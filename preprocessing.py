@@ -10,19 +10,26 @@ def docx_to_list(record_ID, record_dir):
     # Ouvre les stopwords et caractères spéciaux
     stopwordsPath = r"Ressources\stopwords-fr.txt"
     with open(stopwordsPath, 'r', encoding='utf-8') as f:
-        stopwords = f.read()
+        stopwords = set(line.strip() for line in f)
     caracterePath = r"Ressources\caracteres_speciaux.txt"
     with open(caracterePath, 'r', encoding='utf-8') as f:
-        caracteres = f.read()
+        caracteres = set(line.strip() for line in f)
 
     # met le texte du document dans une liste
     allText = [docpara.text for docpara in doc.paragraphs]
+
+    cleaned_allText = []
+    for paragraph_text in allText:
+        cleaned_text = paragraph_text.replace("1-", "")
+        cleaned_allText.append(cleaned_text)
+    allText = cleaned_allText
+
     allText[0] = " ".join(allText[0].split('\n')[3:])
 
     return stopwords, caracteres, allText
 
 
-def clean_and_lemmatize(text, caracteres, stopwords, nlp): # Passer nlp_model en argument
+def clean_and_lemmatize(text, caracteres, stopwords, nlp):
     """
     reformate le texte en token et les lemmatize
     :param text:
@@ -47,11 +54,25 @@ def clean_and_lemmatize(text, caracteres, stopwords, nlp): # Passer nlp_model en
     return filtered_lemmas
 
 
-def final_words(all_text, caracteres, stopwords, nlp): # Passer nlp_model ici aussi
+def final_words(all_text, caracteres, stopwords, nlp, filename):
+    data_path = "data"
+    os.makedirs(data_path, exist_ok=True)
     cleaned_lemmas = []
+    SEPARATEUR = "/"
     for paragraph in all_text:
         cleaned_paragraph_lemmas = clean_and_lemmatize(paragraph, caracteres, stopwords, nlp)
         cleaned_lemmas.extend(cleaned_paragraph_lemmas)
+    filename_txt = filename.replace(".docx", ".txt")
+    filename_txt = os.path.join(data_path, filename_txt)
+
+    with open(filename_txt, 'w', encoding='utf-8') as outfile:
+        is_first_lemma = True
+        for lemma in cleaned_lemmas:
+            if lemma == "speaker" and not is_first_lemma:
+                outfile.write(SEPARATEUR+"\n")
+            outfile.write(lemma + " ")
+            is_first_lemma = False
+
 
     return cleaned_lemmas
 
@@ -67,7 +88,7 @@ if __name__ == "__main__":
             record_ID = filename
 
             stopwords, caracteres, all_text = docx_to_list(record_ID, record_dir)
-            final_word_list = final_words(all_text, caracteres, stopwords, nlp)
+            final_word_list = final_words(all_text, caracteres, stopwords, nlp, filename)
 
             print(final_word_list)
             print("-" * 50)
