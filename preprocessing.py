@@ -73,12 +73,16 @@ def final_words(all_text, caracteres, stopwords, nlp, filename):
             outfile.write(lemma + " ")
             is_first_lemma = False
 
+    """
+    Dans le dossier "data_bert" on trouvera tous les enregistrements .txt (ayant le même nom que les fichiers d'origine .docx),
+    en plus simplifié (uniquement en minuscule, sans l'en-tête, + lemmatisation + suppression des stopwords et de la ponctuation).
+    """
 
     return cleaned_lemmas
 
 
 if __name__ == "__main__":
-    record_dir = r'C:\Users\maeva\Document\ESEO\E4\S2\Projet_synthese\record/'
+    record_dir = r'C:\Users\maeva\Document\ESEO\E4\S2\Projet_synthese\record/' # A modifier avec le dossier où se trouvent les enregistrements .docx
     nlp = spacy.load("fr_core_news_lg")
 
     filenames = os.listdir(record_dir)
