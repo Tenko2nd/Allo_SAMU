@@ -1,10 +1,11 @@
+import os
+
 import docx
 import spacy
 
 
-def docx_to_list(record_ID):
-    docsPath = r'C:\Users\maeva\Document\ESEO\E4\S2/'
-    doc = docx.Document(docsPath + record_ID)
+def docx_to_list(record_ID, record_dir):
+    doc = docx.Document(record_dir + record_ID)
 
     # Ouvre les stopwords et caractères spéciaux
     stopwordsPath = r"Ressources\stopwords-fr.txt"
@@ -56,9 +57,17 @@ def final_words(all_text, caracteres, stopwords, nlp): # Passer nlp_model ici au
 
 
 if __name__ == "__main__":
-    record_ID = "test.docx"
+    record_dir = r'C:\Users\maeva\Document\ESEO\E4\S2\Projet_synthese\record/'
     nlp = spacy.load("fr_core_news_lg")
 
-    stopwords, caracteres, all_text = docx_to_list(record_ID)
-    final_word_list = final_words(all_text, caracteres, stopwords, nlp)
-    print(final_word_list)
+    filenames = os.listdir(record_dir)
+
+    for filename in filenames:
+        if filename.endswith(".docx"):
+            record_ID = filename
+
+            stopwords, caracteres, all_text = docx_to_list(record_ID, record_dir)
+            final_word_list = final_words(all_text, caracteres, stopwords, nlp)
+
+            print(final_word_list)
+            print("-" * 50)
