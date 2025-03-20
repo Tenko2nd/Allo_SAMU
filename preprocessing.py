@@ -1,5 +1,4 @@
 import os
-
 import docx
 import spacy
 
@@ -58,7 +57,6 @@ def final_words(all_text, caracteres, stopwords, nlp, filename):
     data_path = "data"
     os.makedirs(data_path, exist_ok=True)
     cleaned_lemmas = []
-    SEPARATEUR = "/"
     for paragraph in all_text:
         cleaned_paragraph_lemmas = clean_and_lemmatize(paragraph, caracteres, stopwords, nlp)
         cleaned_lemmas.extend(cleaned_paragraph_lemmas)
@@ -69,7 +67,7 @@ def final_words(all_text, caracteres, stopwords, nlp, filename):
         is_first_lemma = True
         for lemma in cleaned_lemmas:
             if lemma == "speaker" and not is_first_lemma:
-                outfile.write(SEPARATEUR+"\n")
+                outfile.write("\n")
             outfile.write(lemma + " ")
             is_first_lemma = False
 

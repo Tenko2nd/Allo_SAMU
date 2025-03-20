@@ -24,7 +24,7 @@ def docx_to_list(record_ID, record_dir):
 def final_words(all_text, nlp, filename):
     cleaned_text = []
     data_path = "data_bert"
-    SEPARATEUR = "/"
+    SEPARATEUR = "[SEP]"
 
     os.makedirs(data_path, exist_ok=True)
 
