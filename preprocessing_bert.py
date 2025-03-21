@@ -17,7 +17,6 @@ def docx_to_list(record_ID, record_dir):
         cleaned_allText.append(cleaned_text)
     allText = cleaned_allText
 
-
     return allText
 
 
@@ -25,15 +24,38 @@ def final_words(all_text, nlp, filename):
     cleaned_text = []
     data_path = "data_bert"
     SEPARATEUR = "[SEP]"
+    spec_char = []
+
 
     os.makedirs(data_path, exist_ok=True)
 
-    for paragraph in all_text:
+    with open('Allo_SAMU/Ressources/caracteres_speciaux.txt', 'r', encoding="utf8") as f:     
+        for line in f:         
+            line = line.strip()
+            for char in line:          
+                 spec_char.append(char) 
+        # print(spec_char)
+
+
+    for paragraph in all_text: 
         paragraph = paragraph.lower()
-
         words = paragraph.split()
+        nouveau_words = []
+        for word in words:
+            mot_split = False 
+            for char in spec_char:
+                if char in word and (char != (".") and char != "," and char != ";" and char !="?" and char !="!"):
+                    parts = word.split(char, 1) 
+                    nouveau_words.extend(parts) 
+                    nouveau_words.append(char) 
+                    mot_split = True
+                    break 
+            if not mot_split: 
+                nouveau_words.append(word) 
+        words = nouveau_words 
+        print(f"Liste des mots du paragraphe : {words}")
         filtered_words_paragraph = ' '.join(words)
-
+        
         cleaned_paragraph = nlp(filtered_words_paragraph)
         for token in cleaned_paragraph:
             cleaned_text.append(token.text)
@@ -58,7 +80,7 @@ def final_words(all_text, nlp, filename):
     return cleaned_text
 
 if __name__ == "__main__":
-    record_dir = r'C:\Users\maeva\Document\ESEO\E4\S2\Projet_synthese\record/' # A modifier avec le dossier où se trouvent les enregistrements .docx
+    record_dir = r'C:\Users\ramamoma\Documents\docx_files/' # A modifier avec le dossier où se trouvent les enregistrements .docx
 
     nlp = spacy.load("fr_core_news_lg")
 
@@ -73,3 +95,6 @@ if __name__ == "__main__":
 
             print(final_word_list)
             print("-" * 50)
+
+
+
