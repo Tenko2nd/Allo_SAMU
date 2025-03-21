@@ -34,8 +34,6 @@ def final_words(all_text, nlp, filename):
             line = line.strip()
             for char in line:          
                  spec_char.append(char) 
-        # print(spec_char)
-
 
     for paragraph in all_text: 
         paragraph = paragraph.lower()
@@ -43,11 +41,19 @@ def final_words(all_text, nlp, filename):
         nouveau_words = []
         for word in words:
             mot_split = False 
+            
             for char in spec_char:
+                if len(word) == 2 and char in word:
+                    nouveau_words.append(word[0])
+                    nouveau_words.append(word[1])
+                    mot_split = True
                 if char in word and (char != (".") and char != "," and char != ";" and char !="?" and char !="!"):
+             
                     parts = word.split(char, 1) 
-                    nouveau_words.extend(parts) 
-                    nouveau_words.append(char) 
+                    nouveau_words.append(parts[0]) 
+                    nouveau_words.append(char)
+                    nouveau_words.append(parts[1])
+
                     mot_split = True
                     break 
             if not mot_split: 
