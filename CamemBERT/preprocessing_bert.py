@@ -22,14 +22,14 @@ def docx_to_list(record_ID, record_dir):
 
 def final_words(all_text, nlp, filename):
     cleaned_text = []
-    data_path = "data_bert"
+    data_path = "../data_bert"
     SEPARATEUR = "[SEP]"
     spec_char = []
 
 
     os.makedirs(data_path, exist_ok=True)
 
-    with open('Ressources/caracteres_speciaux.txt', 'r', encoding="utf8") as f:
+    with open('../Ressources/caracteres_speciaux.txt', 'r', encoding="utf8") as f:
         for line in f:         
             line = line.strip()
             for char in line:          
