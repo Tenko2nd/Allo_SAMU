@@ -34,8 +34,6 @@ def final_words(all_text, nlp, filename):
             line = line.strip()
             for char in line:          
                  spec_char.append(char) 
-        # print(spec_char)
-
 
     for paragraph in all_text: 
         paragraph = paragraph.lower()
@@ -48,22 +46,12 @@ def final_words(all_text, nlp, filename):
                     nouveau_words.append(word[0])
                     nouveau_words.append(word[1])
                     mot_split = True
-
                 if char in word and (char != (".") and char != "," and char != ";" and char !="?" and char !="!"):
                     parts = word.split(char, 1)
                     nouveau_words.append(parts[0])
                     nouveau_words.append(char)
                     nouveau_words.append(parts[1])
                     mot_split = True
-                    break 
-            if not mot_split: 
-                nouveau_words.append(word) 
-        words = nouveau_words
-        filtered_words_paragraph = ' '.join(words)
-        
-        cleaned_paragraph = nlp(filtered_words_paragraph)
-        for token in cleaned_paragraph:
-            cleaned_text.append(token.text)
 
     filename_txt = filename.replace(".docx", ".txt")
     filename_txt = os.path.join(data_path, filename_txt)
