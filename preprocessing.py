@@ -2,6 +2,9 @@ import os
 import docx
 import spacy
 
+#import spacy.cli
+
+
 
 def docx_to_list(record_ID, record_dir):
     doc = docx.Document(record_dir + record_ID)
@@ -80,7 +83,7 @@ def final_words(all_text, caracteres, stopwords, nlp, filename):
 
 
 if __name__ == "__main__":
-    record_dir = r'C:\Users\maeva\Document\ESEO\E4\S2\Projet_synthese\record/' # A modifier avec le dossier où se trouvent les enregistrements .docx
+    record_dir = r'C:\Users\diopndey\Documents\projet de synthese\Data\Retranscriptions_anonymes/' # A modifier avec le dossier où se trouvent les enregistrements .docx
     nlp = spacy.load("fr_core_news_lg")
 
     filenames = os.listdir(record_dir)
