@@ -2,8 +2,7 @@ from transformers import AutoTokenizer
 import camembert_constant as c
 
 
-def tokenize_text(file_path: str, model_name: str, verification: bool = False):
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
+def tokenize_text(file_path: str, tokenizer, verification: bool = False):
 
     with open(file_path, "r", encoding='utf8') as file:
         text = file.read()
