@@ -15,10 +15,11 @@ def classifier_training(json_file):
     with open(json_file) as f:
         data = json.load(f)
 
-    X = np.array([entry["embedding"][0] for entry in data])
+    X = np.array([entry["embedding"] for entry in data])
     Y = np.array([entry["target"] for entry in data])
 
     ids = np.array([entry["id_cas"] for entry in data])
+
 
     X_train, X_test, Y_train, Y_test, ids_train, ids_test = train_test_split(X, Y, ids, test_size=0.15, random_state=42, stratify=Y)
 
@@ -188,8 +189,7 @@ def all_probabilities(json_file, svm_model, X, pipeline):
     print(f"Résultats avec probabilités enregistrés avec succès dans '{output_filename_csv}'")
 
 if __name__ == "__main__":
-    data_file = 'json_camembert/camembert_sans_meta.json'
-    data_file1 = 'data.json'
+    data_file = 'json_camembert/camembert_avec_metadata.json'
     pipeline = "camemBERT"
     X, Y, svm_model = classifier_training(data_file)
     all_probabilities(data_file, svm_model, X, pipeline)
