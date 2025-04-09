@@ -11,6 +11,7 @@ from collections import defaultdict
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+import joblib
 
 
 # Filtrer les données originales en fonction des id_cas attribués
@@ -24,7 +25,8 @@ def extract_XY(dataset):
 
 
 def classifier_training(json_file, model_name, seed = 42):
-    with open(json_file) as f:
+    json_path = os.path.join("json_camembert", json_file)
+    with open(json_path) as f:
         data = json.load(f)
 
     output_dir = None
@@ -36,6 +38,8 @@ def classifier_training(json_file, model_name, seed = 42):
     elif model_name == "Random Forest":
         output_dir = "RF"
     os.makedirs(output_dir, exist_ok=True)
+
+
 
     # ***************** GROUPEMENT DES ID ENSEMBLE ***********************
 
@@ -70,7 +74,7 @@ def classifier_training(json_file, model_name, seed = 42):
     elif model_name == "Logistic Regression":
         model = LogisticRegression(random_state=seed, class_weight='balanced', max_iter=1000)
     elif model_name == "Random Forest":
-        model = RandomForestClassifier(n_estimators=100, max_depth=10, random_state=seed, class_weight='balanced')
+        model = RandomForestClassifier(n_estimators=100, max_depth=100, random_state=seed, class_weight='balanced')
     model.fit(X_train, Y_train)
 
     Y_pred = model.predict(X_test)
@@ -79,26 +83,13 @@ def classifier_training(json_file, model_name, seed = 42):
 
 
     # ---------- Evaluation --------------
-    print("********** Evaluation avant agrégation ************")
 
-    score = recall_score(Y_test, Y_pred)
-    report = classification_report(Y_test, Y_pred)
+    recall_before = recall_score(Y_test, Y_pred)
     tn, fp, fn, tp = confusion_matrix(Y_test, Y_pred).ravel()
-    specificity = tn / (tn + fp)
-    f1 = f1_score(Y_test, Y_pred)
-    roc_auc = roc_auc_score(Y_test, Y_proba)
+    precision_before = tp / (tp + fp)
+    specificity_before = tn / (tn + fp)
+    f1_before = f1_score(Y_test, Y_pred)
     cm_before = confusion_matrix(Y_test, Y_pred)
-
-
-    print(f"Sensibilité : {score:.4f}")
-    print(f"Specificite : {specificity:.4f}")
-    print(f"ROC AUC : {roc_auc:.4f}")
-    print(f"F1 score : {f1:.4f}")
-
-    print("\nClassification Report:")
-    print(report)
-
-    print(f"\nDétail TN={tn}, FP={fp}, FN={fn}, TP={tp}")
 
 
     # *********************** TEST AVEC AGGREGATION PAR ID ******************************
@@ -130,18 +121,14 @@ def classifier_training(json_file, model_name, seed = 42):
     y_score = agg_df["proba"]
 
     # ---- Métriques ----
-    print("********** Evaluation APRES agrégation par ID ************")
 
-    print(f"Sensibilité : {recall_score(y_true, y_pred):.4f}")
-    print(
-        f"Spécificité : {confusion_matrix(y_true, y_pred)[0, 0] / (confusion_matrix(y_true, y_pred)[0, 0] + confusion_matrix(y_true, y_pred)[0, 1]):.4f}")
-    print(f"F1 Score : {f1_score(y_true, y_pred):.4f}")
-    print(f"AUC ROC : {roc_auc_score(y_true, y_score):.4f}")
-    print("\nClassification Report :")
-    print(classification_report(y_true, y_pred))
+    recall_after = recall_score(y_true, y_pred)
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+    specificity_after = tn / (tn + fp)
+    f1_after = f1_score(y_true, y_pred)
+    precision_after = tp / (tp + fp)
 
     # ----- Courbe ROC + affichage des 2 courbes --------
-    output_path_plot = os.path.join(output_dir, "courbe_ROC.png")
 
     fpr_test, tpr_test, _ = roc_curve(Y_test, Y_proba)
     roc_auc_test = auc(fpr_test, tpr_test)
@@ -163,11 +150,12 @@ def classifier_training(json_file, model_name, seed = 42):
     plt.legend(loc="lower right")
     plt.grid(True)
     plt.tight_layout()
+
+    output_path_plot = os.path.join(output_dir, f"{json_file}_courbe_ROC_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}.png")
     plt.savefig(output_path_plot, dpi=300)  # dpi=300 pour une bonne qualité
     plt.show()
 
     # ---- Matrice de confusion agrégée + affichage des 2 matrices ----
-    output_path_plot = os.path.join(output_dir, "confusion_matrix.png")
 
     cm_after = confusion_matrix(y_true, y_pred)
     labels = ['Non STEMI', 'STEMI']
@@ -179,13 +167,30 @@ def classifier_training(json_file, model_name, seed = 42):
     axes[0].set_xlabel("Prédiction", fontsize=12)
     axes[0].set_ylabel("Vérité terrain", fontsize=12)
 
+    text_before = (f"Sensibilité (TP / (TP + FN)) : {recall_before:.2f}"
+                   f"\nSpécificité (TN / (TN + FP)) : {specificity_before:.2f}"
+                    f"\nPrécision (TP / (TP + FP)) : {precision_before:.2f}"
+                   f"\nF1 Score : {f1_before:.2f}")
+    axes[0].text(0.5, -0.25, text_before, fontsize=12, ha='center', va='top', transform=axes[0].transAxes)
+
     sns.heatmap(cm_after, annot=True, fmt='d', cmap='Purples',
                 xticklabels=labels, yticklabels=labels, ax=axes[1], annot_kws={"size": 14})
     axes[1].set_title("Après agrégation par id_cas", fontsize=14)
     axes[1].set_xlabel("Prédiction", fontsize=12)
     axes[1].set_ylabel("Vérité terrain", fontsize=12)
+
+    text_after = (f"Sensibilité (TP / (TP + FN)) : {recall_after:.2f}"
+                  f"\nSpécificité (TN / (TN + FP)) : {specificity_after:.2f}"
+                 f"\nPrécision (TP / (TP + FP)) : {precision_after:.2f}"
+
+                  f"\nF1 Score : {f1_after:.2f}")
+    axes[1].text(0.5, -0.25, text_after, fontsize=12, ha='center', va='top', transform=axes[1].transAxes)
+
     plt.tight_layout()
-    plt.savefig(output_path_plot, dpi=300)  # dpi=300 pour une bonne qualité
+
+    output_path_matrix = os.path.join(output_dir, f"{json_file}_confusion_matrix_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}.png")
+
+    plt.savefig(output_path_matrix, dpi=300)  # dpi=300 pour une bonne qualité
     plt.show()
 
     # ********* Sauvegarde des proba de test dans un .csv ***************
@@ -212,16 +217,25 @@ def classifier_training(json_file, model_name, seed = 42):
     # Prédiction finale (selon proba_1 >= 0.5)
     agg_df["pred_label"] = (agg_df["proba_1"] >= 0.5).astype(int)
 
-    output_filename_csv = "probabilities_bert.csv"
+    output_filename_csv = f"{json_file}_probabilities_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}.csv"
     output_path_csv = os.path.join(output_dir, output_filename_csv)
 
     agg_df.to_csv(output_path_csv, index=False)
-    print(f"Résultats sauvegardés dans {output_path_csv}")
+
+    if model_name == "SVM":
+        joblib.dump(model, f"SVM/{json_file}_SVM_model_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}")
+    elif model_name == "Logistic Regression":
+        joblib.dump(model, f"LR/{json_file}_LR_model_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}")
+    elif model_name == "Random Forest":
+        joblib.dump(model, f"RF/{json_file}_RF_model_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}")
+
+
+    print(f"Résultats sauvegardés dans {output_dir}")
 
 
 
 if __name__ == "__main__":
-    data_file = 'json_camembert/camembert_A_05.json'
+    data_file = 'camembert_sans_metadata.json'
     # LR : "Logistic Regression"
     # RF : "Random Forest"
     # SVM : "SVM"
