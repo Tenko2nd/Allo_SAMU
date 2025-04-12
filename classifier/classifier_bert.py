@@ -24,57 +24,64 @@ def extract_XY(dataset):
     return X, Y
 
 
-def classifier_training(json_file, model_name, seed = 42):
+def classifier_training(json_file, model_name, seed=42):
     json_path = os.path.join("json_camembert", json_file)
     with open(json_path) as f:
         data = json.load(f)
 
-    output_dir = None
-    # ---- Sauvegarde CSV et plots futurs ----
-    if model_name == "SVM":
-        output_dir = "SVM"
-    elif model_name == "Logistic Regression":
-        output_dir = "LR"
-    elif model_name == "Random Forest":
-        output_dir = "RF"
+    output_dir = {"SVM": "SVM", "Logistic Regression": "LR", "Random Forest": "RF"}.get(model_name)
     os.makedirs(output_dir, exist_ok=True)
 
-
-
-    # ***************** GROUPEMENT DES ID ENSEMBLE ***********************
-
-    # Regrouper les entrées par id_cas
+    # Groupement par id_cas
     id_cas_to_entries = defaultdict(list)
     for entry in data:
         id_cas_to_entries[entry["id_cas"]].append(entry)
 
-    # Lister les id_cas uniques
-    unique_ids = list(id_cas_to_entries.keys())
-
-    # Associer une target à chaque id_cas (en supposant que toutes les entrées d’un même id_cas ont la même target)
+    # Associer une target à chaque id_cas
     id_cas_to_target = {id_cas: entries[0]["target"] for id_cas, entries in id_cas_to_entries.items()}
 
-    # Split sur les id_cas uniques (en stratifiant selon leur target)
-    id_targets = [id_cas_to_target[i] for i in unique_ids]
-    ids_train, ids_temp = train_test_split(unique_ids, test_size=0.30, stratify=id_targets, random_state=42)
+    # Étape d’équilibrage des id_cas avant split
+    ids_0 = [id_cas for id_cas, t in id_cas_to_target.items() if t == 0]
+    ids_1 = [id_cas for id_cas, t in id_cas_to_target.items() if t == 1]
+    n_balanced = min(len(ids_0), len(ids_1))
+
+    np.random.seed(seed)
+    ids_0_bal = np.random.choice(ids_0, n_balanced, replace=False).tolist()
+    ids_1_bal = np.random.choice(ids_1, n_balanced, replace=False).tolist()
+    balanced_ids = ids_0_bal + ids_1_bal
+    np.random.shuffle(balanced_ids)
+
+    # Mise à jour du mapping équilibré
+    id_targets = [id_cas_to_target[i] for i in balanced_ids]
+
+    # Split en train / temp, puis temp -> val + test
+    ids_train, ids_temp = train_test_split(
+        balanced_ids, test_size=0.30, stratify=id_targets, random_state=seed
+    )
     id_targets_temp = [id_cas_to_target[i] for i in ids_temp]
-    ids_val, ids_test = train_test_split(ids_temp, test_size=0.5, stratify=id_targets_temp, random_state=42)
+    ids_val, ids_test = train_test_split(
+        ids_temp, test_size=0.5, stratify=id_targets_temp, random_state=seed
+    )
 
     train_data = filter_by_ids(data, ids_train)
+    val_data = filter_by_ids(data, ids_val)
     test_data = filter_by_ids(data, ids_test)
 
     X_train, Y_train = extract_XY(train_data)
+    X_val, Y_val = extract_XY(val_data)
     X_test, Y_test = extract_XY(test_data)
 
-    # ***************** ENTRAINEMENT DU MODELE ***********************
 
-
+    # Entraînement du modèle
     if model_name == "SVM":
-        model = SVC(kernel = 'linear', probability=True, random_state=seed)
+        model = SVC(kernel='linear', probability=True, random_state=seed)
     elif model_name == "Logistic Regression":
-        model = LogisticRegression(random_state=seed, class_weight='balanced', max_iter=1000)
+        model = LogisticRegression(random_state=seed, max_iter=1000)
     elif model_name == "Random Forest":
-        model = RandomForestClassifier(n_estimators=100, max_depth=100, random_state=seed, class_weight='balanced')
+        model = RandomForestClassifier(n_estimators=100, max_depth=100, random_state=seed)
+    else:
+        raise ValueError("Modèle non reconnu.")
+
     model.fit(X_train, Y_train)
 
     Y_pred = model.predict(X_test)
@@ -235,7 +242,7 @@ def classifier_training(json_file, model_name, seed = 42):
 
 
 if __name__ == "__main__":
-    data_file = 'camembert_sans_metadata.json'
+    data_file = 'camembert_AS_05.json'
     # LR : "Logistic Regression"
     # RF : "Random Forest"
     # SVM : "SVM"
