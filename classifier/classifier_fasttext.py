@@ -38,8 +38,21 @@ def balance_data(data, method="undersample", seed=42):
     random.shuffle(balanced)
     return balanced
 
+def save_predictions_to_csv(test_data, y_proba_all, y_pred, filename="predictions_test.csv"):
+    records = []
+    for entry, proba, pred in zip(test_data, y_proba_all, y_pred):
+        records.append({
+            "id_cas": entry["id_cas"],
+            "target": entry["target"],
+            "proba_0": round(proba[0], 5),
+            "proba_1": round(proba[1], 5),
+            "prediction": int(pred)
+        })
+    df = pd.DataFrame(records)
+    df.to_csv(filename, index=False)
 
-def classifier_training(json_file, model_name, balance_method='oversample', seed=42):
+
+def classifier_training(json_file, model_name, balance_method='undersample', seed=2025, threshold=0.5):
     random.seed(seed)
     np.random.seed(seed)
 
@@ -57,7 +70,7 @@ def classifier_training(json_file, model_name, balance_method='oversample', seed
     test_data = test_0 + test_1
     train_data = [entry for entry in data if entry not in test_data]
 
-    # 🎯 équilibrage du training set
+    # équilibrage du training set
     train_data = balance_data(train_data, method=balance_method, seed=seed)
 
     # Conversion en matrices
@@ -66,16 +79,13 @@ def classifier_training(json_file, model_name, balance_method='oversample', seed
     X_test = np.array([entry["embedding"] for entry in test_data])
     Y_test = np.array([entry["target"] for entry in test_data])
 
-    print("Répartition train :", Counter(Y_train))
-    print("Répartition test  :", Counter(Y_test))
-
     # Modèle
     if model_name == "SVM":
         model = SVC(kernel='linear', probability=True, random_state=seed)
     elif model_name == "Logistic Regression":
         model = LogisticRegression(random_state=seed, max_iter=1000)
     elif model_name == "Random Forest":
-        model = RandomForestClassifier(n_estimators=100, max_depth=50, random_state=seed)
+        model = RandomForestClassifier(n_estimators=100, max_depth=100, random_state=seed)
     else:
         raise ValueError("Modèle non reconnu")
 
@@ -83,9 +93,9 @@ def classifier_training(json_file, model_name, balance_method='oversample', seed
     model.fit(X_train, Y_train)
 
 
-    Y_pred = model.predict(X_test)
     Y_proba_all = model.predict_proba(X_test)
     Y_proba = Y_proba_all[:, 1]
+    Y_pred = (Y_proba >= threshold).astype(int)
 
     # ---------- Evaluation ----------------------
 
@@ -128,47 +138,9 @@ def classifier_training(json_file, model_name, balance_method='oversample', seed
     plt.grid(True)
     plt.show()
 
-
-    return X_test, Y, model
-
-
-def all_probabilities(json_file, svm_model, X_test):
-    output_dir = "SVM"
-    os.makedirs(output_dir, exist_ok=True)
-
-    with open(json_file) as f:
-        data = json.load(f)
-
-    # --- Prédire les probabilités pour TOUTES les données ---
-    all_probabilities = svm_model.predict_proba(X)
-
-    # --- Créer la liste de résultats avec id, batch et probabilités ---
-    results_with_probabilities = []
-    for i, original_entry in enumerate(data):
-        prob_class_0 = all_probabilities[i, 0]
-        prob_class_1 = all_probabilities[i, 1]
-
-        result_entry = {
-            "id_cas": original_entry["id_cas"],
-            "probability_0": prob_class_0,
-            "probability_1": prob_class_1
-        }
-        output_filename_csv = "SVM_probabilites_fasttext.csv"
+    save_predictions_to_csv(test_data, Y_proba_all, Y_pred, filename="predictions_test.csv")
 
 
-        results_with_probabilities.append(result_entry)
-
-
-    csv_fieldnames = ["id_cas", "probability_0", "probability_1"]
-
-    output_path = os.path.join(output_dir, output_filename_csv)
-
-    with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=csv_fieldnames)
-        writer.writeheader()
-        writer.writerows(results_with_probabilities)
-
-    print(f"Résultats avec probabilités enregistrés avec succès dans '{output_filename_csv}'")
 
 if __name__ == "__main__":
     data_file_fasstext = 'json_fasttext/fasttext _age_n_sexe_padded.json'
@@ -176,6 +148,5 @@ if __name__ == "__main__":
     # LR : "Logistic Regression"
     # RF : "Random Forest"
     # SVM : "SVM"
-    model_name = "SVM"
-    X, Y, svm_model = classifier_training(data_file_fasstext, model_name)
-    all_probabilities(data_file_fasstext, svm_model, X)
+    model_name = "Logistic Regression"
+    classifier_training(data_file_fasstext, model_name)

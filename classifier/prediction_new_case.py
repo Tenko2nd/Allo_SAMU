@@ -28,5 +28,5 @@ def predict_new_case(model_path, new_case_json, threshold=0.5):
 
 if __name__ == "__main__":
     data_file = 'test.json'
-    model_path = "SVM/SVM_model.joblib"
+    model_path = "SVM/camembert_A_05.json_SVM_model_R81_S56_AUC69.joblib"
     predict_new_case(model_path, data_file)

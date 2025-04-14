@@ -24,8 +24,8 @@ def extract_XY(dataset):
     return X, Y
 
 
-def classifier_training(json_file, model_name, seed=42):
-    json_path = os.path.join("json_camembert", json_file)
+def classifier_training(json_file, model_name, seed=50, agg = 'median', threshold=0.5):
+    json_path = os.path.join("json_drbert", json_file)
     with open(json_path) as f:
         data = json.load(f)
 
@@ -66,6 +66,7 @@ def classifier_training(json_file, model_name, seed=42):
     train_data = filter_by_ids(data, ids_train)
     val_data = filter_by_ids(data, ids_val)
     test_data = filter_by_ids(data, ids_test)
+    print("ID des cas dans le set de test :", ids_test)
 
     X_train, Y_train = extract_XY(train_data)
     X_val, Y_val = extract_XY(val_data)
@@ -115,12 +116,12 @@ def classifier_training(json_file, model_name, seed=42):
 
     # ---- Agrégation par ID (moyenne 'mean', médiane 'median' -> BEST : median) ----
     agg_df = df_test.groupby("id_cas").agg({
-        "proba": "median",
+        "proba": agg,
         "true_label": "first"  # on suppose que le label est le même pour tous les vecteurs du cas
     }).reset_index()
 
     # ---- Seuil à 0.5 pour faire la prédiction binaire par id_cas ----
-    agg_df["pred_label"] = (agg_df["proba"] >= 0.5).astype(int)
+    agg_df["pred_label"] = (agg_df["proba"] >= threshold).astype(int)
 
     # ---- Évaluation par ID ----
     y_true = agg_df["true_label"]
@@ -158,7 +159,7 @@ def classifier_training(json_file, model_name, seed=42):
     plt.grid(True)
     plt.tight_layout()
 
-    output_path_plot = os.path.join(output_dir, f"{json_file}_courbe_ROC_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}.png")
+    output_path_plot = os.path.join(output_dir, f"{json_file}_courbe_ROC_R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}.png")
     plt.savefig(output_path_plot, dpi=300)  # dpi=300 pour une bonne qualité
     plt.show()
 
@@ -195,7 +196,7 @@ def classifier_training(json_file, model_name, seed=42):
 
     plt.tight_layout()
 
-    output_path_matrix = os.path.join(output_dir, f"{json_file}_confusion_matrix_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}.png")
+    output_path_matrix = os.path.join(output_dir, f"{json_file}_confusion_matrix_R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}.png")
 
     plt.savefig(output_path_matrix, dpi=300)  # dpi=300 pour une bonne qualité
     plt.show()
@@ -216,13 +217,13 @@ def classifier_training(json_file, model_name, seed=42):
 
     # Agrégation par moyenne ou mediane
     agg_df = df_test.groupby("id_cas").agg({
-        "proba_0": "median",  # ou "median"
-        "proba_1": "median",  # ou "median"
+        "proba_0": agg,  # ou "median"
+        "proba_1": agg,  # ou "median"
         "true_label": "first"
     }).reset_index()
 
     # Prédiction finale (selon proba_1 >= 0.5)
-    agg_df["pred_label"] = (agg_df["proba_1"] >= 0.5).astype(int)
+    agg_df["pred_label"] = (agg_df["proba_1"] >= threshold).astype(int)
 
     output_filename_csv = f"{json_file}_probabilities_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}.csv"
     output_path_csv = os.path.join(output_dir, output_filename_csv)
@@ -230,11 +231,11 @@ def classifier_training(json_file, model_name, seed=42):
     agg_df.to_csv(output_path_csv, index=False)
 
     if model_name == "SVM":
-        joblib.dump(model, f"SVM/{json_file}_SVM_model_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}")
+        joblib.dump(model, f"SVM/{json_file}_SVM_model_R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}.joblib")
     elif model_name == "Logistic Regression":
-        joblib.dump(model, f"LR/{json_file}_LR_model_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}")
+        joblib.dump(model, f"LR/{json_file}_LR_model_R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}.joblib")
     elif model_name == "Random Forest":
-        joblib.dump(model, f"RF/{json_file}_RF_model_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}")
+        joblib.dump(model, f"RF/{json_file}_RF_model_R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}.joblib")
 
 
     print(f"Résultats sauvegardés dans {output_dir}")
@@ -242,7 +243,7 @@ def classifier_training(json_file, model_name, seed=42):
 
 
 if __name__ == "__main__":
-    data_file = 'camembert_AS_05.json'
+    data_file = 'drbert_A_05.json'
     # LR : "Logistic Regression"
     # RF : "Random Forest"
     # SVM : "SVM"
