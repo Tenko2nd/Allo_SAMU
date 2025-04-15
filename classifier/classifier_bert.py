@@ -11,7 +11,27 @@ from collections import defaultdict
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
+from xgboost import XGBClassifier
 import joblib
+
+def plot_prediction_line_by_id(agg_df, threshold=0.5):
+    # Ajoute la couleur selon la vraie classe
+    agg_df["color"] = agg_df["true_label"].map({0: "blue", 1: "red"})
+    agg_df["y"] = agg_df["true_label"]  # 0 en bas, 1 en haut pour séparer les points
+
+    # Plot
+    plt.figure(figsize=(12, 2.5))
+    plt.scatter(agg_df["proba"], agg_df["y"], c=agg_df["color"], alpha=0.7)
+
+    # Décorations
+    plt.axvline(threshold, color='gray', linestyle='--', label=f"Seuil {threshold}")
+    plt.yticks([0, 1], ["Classe réelle : 0", "Classe réelle : 1"])
+    plt.xlabel("Probabilité prédite (par id_cas)")
+    plt.title("Répartition des prédictions agrégées par id_cas")
+    plt.xlim(0, 1)
+    plt.tight_layout()
+    plt.legend()
+    plt.show()
 
 
 # Filtrer les données originales en fonction des id_cas attribués
@@ -24,12 +44,12 @@ def extract_XY(dataset):
     return X, Y
 
 
-def classifier_training(json_file, model_name, seed=50, agg = 'median', threshold=0.5):
-    json_path = os.path.join("json_drbert", json_file)
+def classifier_training(json_rep, json_file, model_name, seed=2000, agg = 'median', threshold=0.5):
+    json_path = os.path.join(json_rep, json_file)
     with open(json_path) as f:
         data = json.load(f)
 
-    output_dir = {"SVM": "SVM", "Logistic Regression": "LR", "Random Forest": "RF"}.get(model_name)
+    output_dir = {"SVM": "SVM", "Logistic Regression": "LR", "Random Forest": "RF", "XGBoost": "XGBoost"}.get(model_name)
     os.makedirs(output_dir, exist_ok=True)
 
     # Groupement par id_cas
@@ -69,7 +89,6 @@ def classifier_training(json_file, model_name, seed=50, agg = 'median', threshol
     print("ID des cas dans le set de test :", ids_test)
 
     X_train, Y_train = extract_XY(train_data)
-    X_val, Y_val = extract_XY(val_data)
     X_test, Y_test = extract_XY(test_data)
 
 
@@ -80,8 +99,8 @@ def classifier_training(json_file, model_name, seed=50, agg = 'median', threshol
         model = LogisticRegression(random_state=seed, max_iter=1000)
     elif model_name == "Random Forest":
         model = RandomForestClassifier(n_estimators=100, max_depth=100, random_state=seed)
-    else:
-        raise ValueError("Modèle non reconnu.")
+    elif model_name == "XGBoost":
+        model = XGBClassifier(dart_normalized_type = "tree", learning_rate = 0.05, max_iterations = 50, max_depth = 10, use_label_encoder=False, eval_metric='logloss', random_state=seed)
 
     model.fit(X_train, Y_train)
 
@@ -128,6 +147,8 @@ def classifier_training(json_file, model_name, seed=50, agg = 'median', threshol
     y_pred = agg_df["pred_label"]
     y_score = agg_df["proba"]
 
+    plot_prediction_line_by_id(agg_df, threshold=threshold)
+
     # ---- Métriques ----
 
     recall_after = recall_score(y_true, y_pred)
@@ -170,7 +191,7 @@ def classifier_training(json_file, model_name, seed=50, agg = 'median', threshol
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
 
     sns.heatmap(cm_before, annot=True, fmt='d', cmap='Oranges',
-                xticklabels=labels, yticklabels=labels, ax=axes[0], annot_kws={"size": 14})
+                xticklabels=labels, yticklabels=labels, ax=axes[0], annot_kws={"size": 14}, vmin=0)
     axes[0].set_title("Avant agrégation", fontsize=14)
     axes[0].set_xlabel("Prédiction", fontsize=12)
     axes[0].set_ylabel("Vérité terrain", fontsize=12)
@@ -182,7 +203,7 @@ def classifier_training(json_file, model_name, seed=50, agg = 'median', threshol
     axes[0].text(0.5, -0.25, text_before, fontsize=12, ha='center', va='top', transform=axes[0].transAxes)
 
     sns.heatmap(cm_after, annot=True, fmt='d', cmap='Purples',
-                xticklabels=labels, yticklabels=labels, ax=axes[1], annot_kws={"size": 14})
+                xticklabels=labels, yticklabels=labels, ax=axes[1], annot_kws={"size": 14}, vmin=0)
     axes[1].set_title("Après agrégation par id_cas", fontsize=14)
     axes[1].set_xlabel("Prédiction", fontsize=12)
     axes[1].set_ylabel("Vérité terrain", fontsize=12)
@@ -243,9 +264,11 @@ def classifier_training(json_file, model_name, seed=50, agg = 'median', threshol
 
 
 if __name__ == "__main__":
-    data_file = 'drbert_A_05.json'
+    json_rep = "json_camembert"
+    data_file = 'camembert_S_05_3.json'
     # LR : "Logistic Regression"
     # RF : "Random Forest"
     # SVM : "SVM"
-    model = "SVM"
-    classifier_training(data_file, model)
+    # XGBoost
+    model = "XGBoost"
+    classifier_training(json_rep, data_file, model)
