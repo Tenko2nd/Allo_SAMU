@@ -1,9 +1,8 @@
 import os
 import docx
-import spacy
-from spacy.symbols import ORTH # <--- AJOUTER CECI
 import re
 
+# === Extraction du contenu du .docx et insertion des balises SEP ===
 def docx_to_list(record_ID, record_dir):
     doc = docx.Document(record_dir + record_ID)
 
@@ -28,8 +27,8 @@ def docx_to_list(record_ID, record_dir):
 
     return cleaned_allText
 
-
-def final_words(all_text, nlp, filename, option):
+# === Traitement simple sans SpaCy ===
+def final_words(all_text, filename, option):
     cleaned_text = []
     data_path = "data_bert"
     SEPARATEUR = "[SEP]"
@@ -43,42 +42,30 @@ def final_words(all_text, nlp, filename, option):
             for char in line:
                 spec_char.append(char)
 
-    # Traitement des paragraphes et tokenisation (inchangé)
     for paragraph in all_text:
-        paragraph = paragraph.replace(SEPARATEUR, "<<SEP>>")
-        paragraph = paragraph.lower()
-        paragraph = paragraph.replace("<<sep>>", SEPARATEUR)
-
         words = paragraph.split()
         nouveau_words = []
 
         for word in words:
+            if word == SEPARATEUR:
+                nouveau_words.append(word)
+                continue
+
             mot_split = False
             for char in spec_char:
                 if len(word) == 2 and char in word:
                     nouveau_words.extend([word[0], word[1]])
                     mot_split = True
-                elif char in word and char not in [".", ",", ";", "?", "!", "[","]"]:
-                    parts = word.split(char, 1)
-                    nouveau_words.extend([parts[0], char, parts[1]])
-                    mot_split = True
-                    break
             if not mot_split:
                 nouveau_words.append(word)
 
-        print(nouveau_words)
-        filtered_words_paragraph = ' '.join(nouveau_words)
-        cleaned_paragraph = nlp(filtered_words_paragraph)
-
-        for token in cleaned_paragraph:
-            if token.text == SEPARATEUR:
-                 cleaned_text.append(SEPARATEUR)
-            elif token.text == ":" and cleaned_text and cleaned_text[-1].lower() in ["docteur", "interlocuteur"]:
-                 cleaned_text.append(token.text)
-            # Exclure les tokens vides ou juste des espaces (si SpaCy en produisait)
-            elif token.text.strip():
-                 cleaned_text.append(token.text.strip())
-
+        for i, token in enumerate(nouveau_words):
+            if token == SEPARATEUR:
+                cleaned_text.append(SEPARATEUR)
+            elif token == ":" and cleaned_text and cleaned_text[-1].lower() in ["docteur", "interlocuteur"]:
+                cleaned_text.append(":")
+            elif token.strip():
+                cleaned_text.append(token.strip())
 
     filename_txt = filename.replace(".docx", ".txt")
     filename_txt = os.path.join(data_path, filename_txt)
@@ -88,15 +75,13 @@ def final_words(all_text, nlp, filename, option):
 
         for i, word in enumerate(cleaned_text):
             if word == SEPARATEUR:
-
                 outfile.write(SEPARATEUR)
                 outfile.write("\n")
-                is_start_of_line = True #
+                is_start_of_line = True
                 continue
 
             if option == "sans_speaker" and word.lower() in ["docteur", "interlocuteur", ":"]:
-                 # Si le mot filtré est suivi de :, on le saute aussi potentiellement
-                 continue
+                continue
 
             if not is_start_of_line:
                 outfile.write(" ")
@@ -110,21 +95,17 @@ def final_words(all_text, nlp, filename, option):
 if __name__ == "__main__":
     record_dir = r'C:\Users\ramamoma\Documents\data/' # A modifier avec le dossier où se trouvent les enregistrements .docx
 
-    nlp = spacy.load("fr_core_news_lg")
 
-    # Règle spéciale pour que "[SEP]" soit toujours traité comme un seul token
-    special_case = [{ORTH: "[SEP]"}]
-    nlp.tokenizer.add_special_case("[SEP]", special_case)
 
     filenames = os.listdir(record_dir)
-    option = "avec_speaker"
+    option = "sans_speaker"
 
     for filename in filenames:
         if filename.endswith(".docx"):
             record_ID = filename
 
             all_text = docx_to_list(record_ID, record_dir)
-            final_word_list = final_words(all_text, nlp, filename, option)
+            final_word_list = final_words(all_text, filename, option)
 
             print(final_word_list)
             print("-" * 50)
