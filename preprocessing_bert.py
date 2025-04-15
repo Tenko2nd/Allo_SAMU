@@ -4,7 +4,7 @@ import spacy
 from spacy.symbols import ORTH # <--- AJOUTER CECI
 import re
 
-def docx_to_list(record_ID, record_dir):
+def docx_to_list(record_ID, record_dir, option):
     doc = docx.Document(record_dir + record_ID)
 
     allText = [docpara.text for docpara in doc.paragraphs]
@@ -15,11 +15,16 @@ def docx_to_list(record_ID, record_dir):
     for paragraph_text in allText:
         paragraph_text = paragraph_text.replace("1-", "")
 
-        paragraph_text = paragraph_text.replace('SPEAKER_01', '[SEP]\nDocteur:')
-        paragraph_text = paragraph_text.replace('SPEAKER_00', '[SEP]\nInterlocuteur:')
-        paragraph_text = paragraph_text.replace('SPEAKER_02', '[SEP]\nInterlocuteur:')
-        paragraph_text = paragraph_text.replace('SPEAKER_03', '[SEP]\nInterlocuteur:')
-
+        if option == "avec_speaker":
+            paragraph_text = paragraph_text.replace('SPEAKER_01', '[SEP]\nDocteur:')
+            paragraph_text = paragraph_text.replace('SPEAKER_00', '[SEP]\nInterlocuteur:')
+            paragraph_text = paragraph_text.replace('SPEAKER_02', '[SEP]\nInterlocuteur:')
+            paragraph_text = paragraph_text.replace('SPEAKER_03', '[SEP]\nInterlocuteur:')
+        elif option == "sans_speaker":
+            paragraph_text = paragraph_text.replace('SPEAKER_01', '[SEP]\n')
+            paragraph_text = paragraph_text.replace('SPEAKER_00', '[SEP]\n')
+            paragraph_text = paragraph_text.replace('SPEAKER_02', '[SEP]\n')
+            paragraph_text = paragraph_text.replace('SPEAKER_03', '[SEP]\n')
         cleaned_allText.append(paragraph_text)
 
     if cleaned_allText:
@@ -66,7 +71,24 @@ def final_words(all_text, nlp, filename, option):
             if not mot_split:
                 nouveau_words.append(word)
 
+
         print(nouveau_words)
+        # if option == "sans_speaker":
+        #     if len(nouveau_words) >= 2:
+        #         del nouveau_words[0]
+        #         del nouveau_words[0]
+        #     i = 0
+        #     while i < len(nouveau_words):
+        #         if nouveau_words[i] == SEPARATEUR:
+        #             # Supprimer les deux mots suivants si possibles
+        #             if i + 1 < len(nouveau_words):
+        #                 del nouveau_words[i + 1]
+        #             if i + 1 < len(nouveau_words):  # encore une fois (la liste a déjà changé)
+        #                 del nouveau_words[i + 1]
+        #         i += 1  # on avance normalement
+        #     print("-------------------------------- \n")
+        #     print(nouveau_words)
+
         filtered_words_paragraph = ' '.join(nouveau_words)
         cleaned_paragraph = nlp(filtered_words_paragraph)
 
@@ -94,9 +116,9 @@ def final_words(all_text, nlp, filename, option):
                 is_start_of_line = True #
                 continue
 
-            if option == "sans_speaker" and word.lower() in ["docteur", "interlocuteur", ":"]:
-                 # Si le mot filtré est suivi de :, on le saute aussi potentiellement
-                 continue
+            # if option == "sans_speaker" and word.lower() in ["docteur", "interlocuteur", ":"]:
+            #      # Si le mot filtré est suivi de :, on le saute aussi potentiellement
+            #      continue
 
             if not is_start_of_line:
                 outfile.write(" ")
@@ -117,14 +139,14 @@ if __name__ == "__main__":
     nlp.tokenizer.add_special_case("[SEP]", special_case)
 
     filenames = os.listdir(record_dir)
-    option = "avec_speaker"
+    option = "sans_speaker"
 
     for filename in filenames:
         if filename.endswith(".docx"):
             record_ID = filename
 
-            all_text = docx_to_list(record_ID, record_dir)
+            all_text = docx_to_list(record_ID, record_dir,option)
             final_word_list = final_words(all_text, nlp, filename, option)
-
-            print(final_word_list)
-            print("-" * 50)
+            #
+            # print(final_word_list)
+            # print("-" * 50)
