@@ -133,7 +133,7 @@ def embeddings_to_json(data_bert_dir, file_list, tokenizer, model, type_metadata
 
 
 if __name__ == "__main__":
-    data_bert_dir = "data_bert_normalized"
+    data_bert_dir = "data_bert_nlp_speaker"
     csv_file_path = "../Cas-AnonymeFINAL.csv"
     list_type_metadata = ["A", "AS", "S", None]
     list_model_name = ["Dr-BERT/DrBERT-7GB", "almanach/camembert-base", "flaubert/flaubert_large_cased", "almanach/camembertav2-base"]
@@ -152,7 +152,7 @@ if __name__ == "__main__":
             print(f"\nProcessing type {type_metadata} for model {model_name}")
             json_output = embeddings_to_json(data_bert_dir=data_bert_dir, file_list=file_list, tokenizer=tokenizer, model=model, type_metadata=type_metadata)
 
-            output_dir = f"{model_name.split('/')[-1]}_json"
+            output_dir = f"{model_name.split('/')[-1]}_{('_').join(data_bert_dir.split('_')[-2:])}_json"
             json_file = f"{model_name.split('/')[-1]}_{type_metadata if type_metadata is not None else 'sans_metadata'}_{c.CONTEXT_LEN}.json"
 
             if not os.path.isdir(output_dir):

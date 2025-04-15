@@ -36,7 +36,7 @@ def final_words(all_text, filename, option):
 
     os.makedirs(data_path, exist_ok=True)
 
-    with open('Ressources/caracteres_speciaux.txt', 'r', encoding="utf8") as f:
+    with open('../Ressources/caracteres_speciaux.txt', 'r', encoding="utf8") as f:
         for line in f:
             line = line.strip()
             for char in line:
@@ -93,7 +93,7 @@ def final_words(all_text, filename, option):
 
 
 if __name__ == "__main__":
-    record_dir = r'C:\Users\ramamoma\Documents\data/' # A modifier avec le dossier où se trouvent les enregistrements .docx
+    record_dir = r'C:\Users\casserma\Documents\Data\Retranscriptions Anonymes_FINAL/' # A modifier avec le dossier où se trouvent les enregistrements .docx
 
 
 
@@ -107,5 +107,5 @@ if __name__ == "__main__":
             all_text = docx_to_list(record_ID, record_dir)
             final_word_list = final_words(all_text, filename, option)
 
-            print(final_word_list)
-            print("-" * 50)
+            # print(final_word_list)
+            # print("-" * 50)

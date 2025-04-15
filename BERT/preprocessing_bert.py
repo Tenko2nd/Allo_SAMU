@@ -32,7 +32,7 @@ def docx_to_list(record_ID, record_dir):
 
 def final_words(all_text, nlp, filename, option):
     cleaned_text = []
-    data_path = "data_bert_normalized"
+    data_path = "data_bert_nlp_noSpeaker"
     SEPARATEUR = "[SEP]"
     spec_char = []
 
@@ -109,7 +109,7 @@ def final_words(all_text, nlp, filename, option):
 
 
 if __name__ == "__main__":
-    record_dir = r'C:\Users\casserma\Documents\Data\Retranscriptions Anonymes/' # A modifier avec le dossier où se trouvent les enregistrements .docx
+    record_dir = r'C:\Users\casserma\Documents\Data\Retranscriptions Anonymes_FINAL/' # A modifier avec le dossier où se trouvent les enregistrements .docx
 
     nlp = spacy.load("fr_core_news_lg")
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     nlp.tokenizer.add_special_case("[SEP]", special_case)
 
     filenames = os.listdir(record_dir)
-    option = "avec_speaker"
+    option = "sans_speaker"
 
     for filename in tqdm(filenames):
         if filename.endswith(".docx"):
