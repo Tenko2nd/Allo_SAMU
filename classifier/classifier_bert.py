@@ -1,4 +1,6 @@
 import os
+import random
+
 import seaborn as sns
 import pandas as pd
 import json
@@ -31,7 +33,6 @@ def plot_prediction_line_by_id(agg_df, threshold=0.5):
     plt.xlim(0, 1)
     plt.tight_layout()
     plt.legend()
-    plt.show()
 
 
 # Filtrer les données originales en fonction des id_cas attribués
@@ -44,13 +45,14 @@ def extract_XY(dataset):
     return X, Y
 
 
-def classifier_training(json_rep, json_file, model_name, seed=2000, agg = 'median', threshold=0.5):
-    json_path = os.path.join(json_rep, json_file)
+def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', threshold=0.4):
+    json_path = os.path.join(json_rep, json_file+".json")
     with open(json_path) as f:
         data = json.load(f)
 
     output_dir = {"SVM": "SVM", "Logistic Regression": "LR", "Random Forest": "RF", "XGBoost": "XGBoost"}.get(model_name)
     os.makedirs(output_dir, exist_ok=True)
+
 
     # Groupement par id_cas
     id_cas_to_entries = defaultdict(list)
@@ -75,16 +77,11 @@ def classifier_training(json_rep, json_file, model_name, seed=2000, agg = 'media
     id_targets = [id_cas_to_target[i] for i in balanced_ids]
 
     # Split en train / temp, puis temp -> val + test
-    ids_train, ids_temp = train_test_split(
-        balanced_ids, test_size=0.30, stratify=id_targets, random_state=seed
-    )
-    id_targets_temp = [id_cas_to_target[i] for i in ids_temp]
-    ids_val, ids_test = train_test_split(
-        ids_temp, test_size=0.5, stratify=id_targets_temp, random_state=seed
+    ids_train, ids_test = train_test_split(
+        balanced_ids, test_size=0.15, stratify=id_targets, random_state=seed
     )
 
     train_data = filter_by_ids(data, ids_train)
-    val_data = filter_by_ids(data, ids_val)
     test_data = filter_by_ids(data, ids_test)
     print("ID des cas dans le set de test :", ids_test)
 
@@ -94,13 +91,24 @@ def classifier_training(json_rep, json_file, model_name, seed=2000, agg = 'media
 
     # Entraînement du modèle
     if model_name == "SVM":
-        model = SVC(kernel='linear', probability=True, random_state=seed)
+        model = SVC(kernel='linear',
+                    probability=True,
+                    random_state=seed)
     elif model_name == "Logistic Regression":
-        model = LogisticRegression(random_state=seed, max_iter=1000)
+        model = LogisticRegression(random_state=seed,
+                                   max_iter=1000)
     elif model_name == "Random Forest":
-        model = RandomForestClassifier(n_estimators=100, max_depth=100, random_state=seed)
+        model = RandomForestClassifier(n_estimators=100,
+                                       max_depth=100,
+                                       random_state=seed)
     elif model_name == "XGBoost":
-        model = XGBClassifier(dart_normalized_type = "tree", learning_rate = 0.05, max_iterations = 50, max_depth = 10, use_label_encoder=False, eval_metric='logloss', random_state=seed)
+        model = XGBClassifier(dart_normalized_type = "forest",
+                              learning_rate = 0.05,
+                              max_iterations = 50,
+                              max_depth = 10,
+                              use_label_encoder=False,
+                              eval_metric='logloss',
+                              random_state=seed)
 
     model.fit(X_train, Y_train)
 
@@ -147,7 +155,6 @@ def classifier_training(json_rep, json_file, model_name, seed=2000, agg = 'media
     y_pred = agg_df["pred_label"]
     y_score = agg_df["proba"]
 
-    plot_prediction_line_by_id(agg_df, threshold=threshold)
 
     # ---- Métriques ----
 
@@ -180,9 +187,21 @@ def classifier_training(json_rep, json_file, model_name, seed=2000, agg = 'media
     plt.grid(True)
     plt.tight_layout()
 
-    output_path_plot = os.path.join(output_dir, f"{json_file}_courbe_ROC_R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}.png")
-    plt.savefig(output_path_plot, dpi=300)  # dpi=300 pour une bonne qualité
+    # -------------- Pour l'enregistrement des différents fichiers --------------
+    list_metrics = f"R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}"
+    output_dir_sub = f"{output_dir}/{json_file}/{list_metrics}_seed{seed}"
+    os.makedirs(output_dir_sub, exist_ok=True)
+    # ---------------------------------------------------------------------------
+
+    output_path_plot = os.path.join(output_dir_sub, f"{json_file}_courbe_ROC_{list_metrics}.png")
+    plt.savefig(output_path_plot, dpi=300)
     plt.show()
+
+    plot_prediction_line_by_id(agg_df, threshold=threshold)
+    output_path_plot = os.path.join(output_dir_sub, f"{json_file}_droite_repartition_{list_metrics}.png")
+    plt.savefig(output_path_plot, dpi=300)
+    plt.show()
+
 
     # ---- Matrice de confusion agrégée + affichage des 2 matrices ----
 
@@ -217,7 +236,7 @@ def classifier_training(json_rep, json_file, model_name, seed=2000, agg = 'media
 
     plt.tight_layout()
 
-    output_path_matrix = os.path.join(output_dir, f"{json_file}_confusion_matrix_R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}.png")
+    output_path_matrix = os.path.join(output_dir_sub, f"{json_file}_confusion_matrix_{list_metrics}.png")
 
     plt.savefig(output_path_matrix, dpi=300)  # dpi=300 pour une bonne qualité
     plt.show()
@@ -246,29 +265,30 @@ def classifier_training(json_rep, json_file, model_name, seed=2000, agg = 'media
     # Prédiction finale (selon proba_1 >= 0.5)
     agg_df["pred_label"] = (agg_df["proba_1"] >= threshold).astype(int)
 
-    output_filename_csv = f"{json_file}_probabilities_R{int(recall_after*100)}_AUC{int(roc_auc_agg*100)}.csv"
-    output_path_csv = os.path.join(output_dir, output_filename_csv)
+    output_filename_csv = f"{json_file}_probabilities_{list_metrics}.csv"
+    output_path_csv = os.path.join(output_dir_sub, output_filename_csv)
 
     agg_df.to_csv(output_path_csv, index=False)
 
     if model_name == "SVM":
-        joblib.dump(model, f"SVM/{json_file}_SVM_model_R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}.joblib")
+        joblib.dump(model, f"{output_dir_sub}/{json_file}_SVM_model_{list_metrics}.joblib")
     elif model_name == "Logistic Regression":
-        joblib.dump(model, f"LR/{json_file}_LR_model_R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}.joblib")
+        joblib.dump(model, f"{output_dir_sub}/{json_file}_LR_model_{list_metrics}.joblib")
     elif model_name == "Random Forest":
-        joblib.dump(model, f"RF/{json_file}_RF_model_R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}.joblib")
+        joblib.dump(model, f"{output_dir_sub}/{json_file}_RF_model_{list_metrics}.joblib")
 
 
-    print(f"Résultats sauvegardés dans {output_dir}")
+    print(f"Résultats sauvegardés dans {output_dir_sub}")
 
 
 
 if __name__ == "__main__":
-    json_rep = "json_camembert"
-    data_file = 'camembert_S_05_3.json'
+    json_rep = "json_bert/camembertav2-base_raw_speaker_json"
+    data_file = 'camembertav2-base_sans_metadata_3'
     # LR : "Logistic Regression"
     # RF : "Random Forest"
     # SVM : "SVM"
     # XGBoost
+    seed = random.randint(1, 10000)
     model = "XGBoost"
-    classifier_training(json_rep, data_file, model)
+    classifier_training(json_rep, data_file, model, seed)

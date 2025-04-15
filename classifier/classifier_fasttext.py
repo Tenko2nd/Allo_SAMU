@@ -8,12 +8,10 @@ from sklearn.metrics import classification_report, recall_score, confusion_matri
 import json
 import numpy as np
 import matplotlib.pyplot as plt
-import csv
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 import random
-from collections import Counter
-
+from xgboost import XGBClassifier
 
 def balance_data(data, method="undersample", seed=42):
     random.seed(seed)
@@ -52,7 +50,7 @@ def save_predictions_to_csv(test_data, y_proba_all, y_pred, filename="prediction
     df.to_csv(filename, index=False)
 
 
-def classifier_training(json_file, model_name, balance_method='undersample', seed=2025, threshold=0.5):
+def classifier_training(json_file, model_name, balance_method='undersample', seed=30, threshold=0.5):
     random.seed(seed)
     np.random.seed(seed)
 
@@ -83,9 +81,13 @@ def classifier_training(json_file, model_name, balance_method='undersample', see
     if model_name == "SVM":
         model = SVC(kernel='linear', probability=True, random_state=seed)
     elif model_name == "Logistic Regression":
-        model = LogisticRegression(random_state=seed, max_iter=1000)
+        model = LogisticRegression(random_state=seed, max_iter=1000, class_weight="balanced", solver="liblinear")
     elif model_name == "Random Forest":
         model = RandomForestClassifier(n_estimators=100, max_depth=100, random_state=seed)
+    elif model_name == "XGBoost":
+        model = XGBClassifier(dart_normalized_type="forest", learning_rate=0.05, max_iterations=50, max_depth=10,
+                          use_label_encoder=False, eval_metric='logloss', random_state=seed)
+
     else:
         raise ValueError("Modèle non reconnu")
 
@@ -122,7 +124,7 @@ def classifier_training(json_file, model_name, balance_method='undersample', see
 
     plt.figure(figsize=(8, 6))
     sns.heatmap(cm, annot=True, fmt='d', cmap=cmap,
-                xticklabels=classes, yticklabels=classes, annot_kws={"size": 14})
+                xticklabels=classes, yticklabels=classes, annot_kws={"size": 14}, vmin = 0)
 
     plt.ylabel('True Label', fontsize=12)
     plt.xlabel('Predicted Label', fontsize=12)
@@ -143,10 +145,12 @@ def classifier_training(json_file, model_name, balance_method='undersample', see
 
 
 if __name__ == "__main__":
-    data_file_fasstext = 'json_fasttext/fasttext _age_n_sexe_padded.json'
-    data_file_metadata = 'json_camembert/camembert_sans_metadata.json'
+    data_file_fasstext_old = 'json_fasttext/old/fasttext_sans_metadata_padded.json'
+    data_file_fasstext_new = 'json_fasttext/new/json_sans_metadonnee.json'
+
     # LR : "Logistic Regression"
     # RF : "Random Forest"
     # SVM : "SVM"
-    model_name = "Logistic Regression"
-    classifier_training(data_file_fasstext, model_name)
+    #
+    model_name = "XGBoost"
+    classifier_training(data_file_fasstext_old, model_name)
