@@ -3,6 +3,7 @@ import docx
 import spacy
 from spacy.symbols import ORTH # <--- AJOUTER CECI
 import re
+from tqdm import tqdm
 
 def docx_to_list(record_ID, record_dir):
     doc = docx.Document(record_dir + record_ID)
@@ -31,19 +32,19 @@ def docx_to_list(record_ID, record_dir):
 
 def final_words(all_text, nlp, filename, option):
     cleaned_text = []
-    data_path = "data_bert"
+    data_path = "data_bert_normalized"
     SEPARATEUR = "[SEP]"
     spec_char = []
 
     os.makedirs(data_path, exist_ok=True)
 
-    with open('Ressources/caracteres_speciaux.txt', 'r', encoding="utf8") as f:
+    with open('../Ressources/caracteres_speciaux.txt', 'r', encoding="utf8") as f:
         for line in f:
             line = line.strip()
             for char in line:
                 spec_char.append(char)
 
-    # Traitement des paragraphes et tokenisation (inchangé)
+    # Traitement des paragraphes et tokenisation
     for paragraph in all_text:
         paragraph = paragraph.replace(SEPARATEUR, "<<SEP>>")
         paragraph = paragraph.lower()
@@ -66,7 +67,7 @@ def final_words(all_text, nlp, filename, option):
             if not mot_split:
                 nouveau_words.append(word)
 
-        print(nouveau_words)
+        # print(nouveau_words)
         filtered_words_paragraph = ' '.join(nouveau_words)
         cleaned_paragraph = nlp(filtered_words_paragraph)
 
@@ -108,7 +109,7 @@ def final_words(all_text, nlp, filename, option):
 
 
 if __name__ == "__main__":
-    record_dir = r'C:\Users\ramamoma\Documents\data/' # A modifier avec le dossier où se trouvent les enregistrements .docx
+    record_dir = r'C:\Users\casserma\Documents\Data\Retranscriptions Anonymes/' # A modifier avec le dossier où se trouvent les enregistrements .docx
 
     nlp = spacy.load("fr_core_news_lg")
 
@@ -120,12 +121,12 @@ if __name__ == "__main__":
     filenames = os.listdir(record_dir)
     option = "sans_speaker"
 
-    for filename in filenames:
+    for filename in tqdm(filenames):
         if filename.endswith(".docx"):
             record_ID = filename
 
             all_text = docx_to_list(record_ID, record_dir)
             final_word_list = final_words(all_text, nlp, filename, option)
 
-            print(final_word_list)
-            print("-" * 50)
+            # print(final_word_list)
+            # print("-" * 50)
