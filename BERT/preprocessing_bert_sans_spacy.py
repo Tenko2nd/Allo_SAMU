@@ -3,7 +3,7 @@ import docx
 import re
 
 # === Extraction du contenu du .docx et insertion des balises SEP ===
-def docx_to_list(record_ID, record_dir):
+def docx_to_list(record_ID, record_dir, option):
     doc = docx.Document(record_dir + record_ID)
 
     allText = [docpara.text for docpara in doc.paragraphs]
@@ -14,10 +14,16 @@ def docx_to_list(record_ID, record_dir):
     for paragraph_text in allText:
         paragraph_text = paragraph_text.replace("1-", "")
 
-        paragraph_text = paragraph_text.replace('SPEAKER_01', '[SEP]\nDocteur:')
-        paragraph_text = paragraph_text.replace('SPEAKER_00', '[SEP]\nInterlocuteur:')
-        paragraph_text = paragraph_text.replace('SPEAKER_02', '[SEP]\nInterlocuteur:')
-        paragraph_text = paragraph_text.replace('SPEAKER_03', '[SEP]\nInterlocuteur:')
+        if option == "avec_speaker":
+            paragraph_text = paragraph_text.replace('SPEAKER_01', '[SEP]\nDocteur:')
+            paragraph_text = paragraph_text.replace('SPEAKER_00', '[SEP]\nInterlocuteur:')
+            paragraph_text = paragraph_text.replace('SPEAKER_02', '[SEP]\nInterlocuteur:')
+            paragraph_text = paragraph_text.replace('SPEAKER_03', '[SEP]\nInterlocuteur:')
+        elif option == "sans_speaker":
+            paragraph_text = paragraph_text.replace('SPEAKER_01', '[SEP]\n')
+            paragraph_text = paragraph_text.replace('SPEAKER_00', '[SEP]\n')
+            paragraph_text = paragraph_text.replace('SPEAKER_02', '[SEP]\n')
+            paragraph_text = paragraph_text.replace('SPEAKER_03', '[SEP]\n')
 
         cleaned_allText.append(paragraph_text)
 
@@ -104,7 +110,7 @@ if __name__ == "__main__":
         if filename.endswith(".docx"):
             record_ID = filename
 
-            all_text = docx_to_list(record_ID, record_dir)
+            all_text = docx_to_list(record_ID, record_dir,option)
             final_word_list = final_words(all_text, filename, option)
 
             # print(final_word_list)
