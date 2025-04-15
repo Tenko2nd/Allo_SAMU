@@ -3,6 +3,7 @@ Cas-AnonymeFINAL.csv
 data_bert/
 data/
 *.json
+*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

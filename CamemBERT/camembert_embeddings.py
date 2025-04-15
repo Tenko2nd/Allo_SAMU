@@ -72,24 +72,19 @@ def get_normalized_metadata(patient_id: str, metadata: dict[str, dict[str, any]]
         try:
             # Normalize Age (assuming age range 40-120)
             age = int(patient_metadata['Age'])
-            normalized_age = (age - 30) / (120 - 30)
-
-            # Normalize Month (0-11 for January-December, then 0-1)
-            date_appel_str = patient_metadata['Date Appel']
-            month = int(date_appel_str.split('/')[1]) - 1 # Month from Date Appel, adjust to 0-11
-            normalized_month = month / 11
+            normalized_age = ((age - 30) / (120 - 30)) - 0.
 
             # Sexe (0 for F, 1 for M)
-            sexe = 1 if patient_metadata['Sexe'].upper() == 'M' else 0
+            sexe = 0.5 if patient_metadata['Sexe'].upper() == 'M' else -0.5
 
-            return np.array([normalized_age, sexe, normalized_month], dtype=np.float32)
+            return np.array([sexe], dtype=np.float32) #[normalized_age, sexe]
 
         except (ValueError, KeyError) as e:
             print(f"Error processing metadata for patient {patient_id}: {e}")
-            return np.array([0.5, 0.5, 0.5], dtype=np.float32) # Default metadata if error
+            return np.array([0, 0], dtype=np.float32) # Default metadata if error
     else:
         print(f"Warning: No metadata found for patient ID: {patient_id}")
-        return np.array([0.5, 0.5, 0.5], dtype=np.float32) # Default metadata if not found
+        return np.array([0, 0], dtype=np.float32) # Default metadata if not found
 
 
 def embeddings_to_json(data_bert_dir, file_list, tokenizer, model, metadata=True):
@@ -113,15 +108,18 @@ def embeddings_to_json(data_bert_dir, file_list, tokenizer, model, metadata=True
                 normalized_metadata = get_normalized_metadata(ID_Patient, metadata_dict)
 
             for i, embeddings in enumerate(embeddings_list):
+                embeddings = embeddings.flatten()
+                # norme_l2 = np.linalg.norm(embeddings)
+                # embedding_normalise = embeddings / norme_l2
                 # Concatenate embeddings with metadata
                 if metadata:
-                    metadata_embedding_list = np.concatenate((embeddings.flatten(), normalized_metadata)).tolist() # Flatten embeddings and concatenate
+                    metadata_embedding_list = np.concatenate((embeddings, normalized_metadata)).tolist() # Flatten embeddings and concatenate
 
                 batch_json = {
                     "id_cas": ID_Patient,
                     "batch": i + 1,
                     "target": Target,
-                    "embedding": metadata_embedding_list if metadata else embeddings.flatten().tolist()
+                    "embedding": metadata_embedding_list if metadata else embeddings.tolist()
                 }
                 json_output.append(batch_json)
         else:
@@ -139,11 +137,17 @@ if __name__ == "__main__":
     file_list = [f for f in os.listdir(data_bert_dir) if f.endswith(".txt")]
 
     tokenizer = AutoTokenizer.from_pretrained(c.MODEL_NAME)
-    model = TFAutoModel.from_pretrained(c.MODEL_NAME)
+    model = TFAutoModel.from_pretrained(c.MODEL_NAME, from_pt=True)
 
-    json_output = embeddings_to_json(data_bert_dir=data_bert_dir, file_list=file_list, tokenizer=tokenizer, model=model, metadata=True)
+    json_output = embeddings_to_json(data_bert_dir=data_bert_dir, file_list=file_list, tokenizer=tokenizer, model=model, metadata=False)
 
-    output_json_file = "camembert_avec_metadata.json"
-    with open(output_json_file, 'w') as f:
+    output_dir = "camembert_json"
+    json_file = "camembert_sans_metadata_3.json"
+
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
+        print(f"\nCreated directory {output_dir}")
+
+    with open(f"{output_dir}/{json_file}", 'w') as f:
         json.dump(json_output, f, indent=2)
-    print(f"\nCombined JSON output saved to {output_json_file}")
+    print(f"\nCombined JSON output saved to {output_dir}/{json_file}")
