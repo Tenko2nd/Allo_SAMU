@@ -1,7 +1,7 @@
 *.ipynb
 Cas-AnonymeFINAL.csv
-data_bert/
-data/
+BERT/data*
+BERT/*_json/
 *.json
 *.zip
 

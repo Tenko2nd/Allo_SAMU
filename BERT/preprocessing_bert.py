@@ -1,6 +1,7 @@
 import os
 import docx
 import spacy
+from tqdm import tqdm
 
 
 def docx_to_list(record_ID, record_dir):
@@ -22,20 +23,20 @@ def docx_to_list(record_ID, record_dir):
 
         cleaned_allText.append(cleaned_text)
     allText = cleaned_allText
-    print (allText)
+    # print (allText)
     return allText
 
 
 def final_words(all_text, nlp, filename):
     cleaned_text = []
-    data_path = "data_bert"
+    data_path = "data_bert_w_nlp"
     SEPARATEUR = "[SEP]"
     spec_char = []
 
 
     os.makedirs(data_path, exist_ok=True)
 
-    with open('Ressources/caracteres_speciaux.txt', 'r', encoding="utf8") as f:
+    with open('../Ressources/caracteres_speciaux.txt', 'r', encoding="utf8") as f:
         for line in f:
             line = line.strip()
             for char in line:
@@ -65,7 +66,7 @@ def final_words(all_text, nlp, filename):
             if not mot_split:
                 nouveau_words.append(word)
         words = nouveau_words
-        print(f"Liste des mots du paragraphe : {words}")
+        # print(f"Liste des mots du paragraphe : {words}")
         filtered_words_paragraph = ' '.join(words)
 
         cleaned_paragraph = nlp(filtered_words_paragraph)
@@ -92,21 +93,21 @@ def final_words(all_text, nlp, filename):
     return 0
 
 if __name__ == "__main__":
-    record_dir = r'C:\Users\ramamoma\Documents\data/' # A modifier avec le dossier où se trouvent les enregistrements .docx
+    record_dir = r'C:\Users\casserma\Documents\Data\Retranscriptions Anonymes/' # A modifier avec le dossier où se trouvent les enregistrements .docx
 
     nlp = spacy.load("fr_core_news_lg")
 
     filenames = os.listdir(record_dir)
 
-    for filename in filenames:
+    for filename in tqdm(filenames):
         if filename.endswith(".docx"):
             record_ID = filename
 
             all_text = docx_to_list(record_ID, record_dir)
             final_word_list = final_words(all_text, nlp, filename)
 
-            print(final_word_list)
-            print("-" * 50)
+            # print(final_word_list)
+            # print("-" * 50)
 
 
 
