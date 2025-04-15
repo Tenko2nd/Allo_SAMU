@@ -1,6 +1,14 @@
 *.ipynb
 data-bert/
 data/
+*.png
+*.csv
+*.joblib
+*.json
+classifier/SVM/
+classifier/RF/
+classifier/LR/
+classifier/XGBoost/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
