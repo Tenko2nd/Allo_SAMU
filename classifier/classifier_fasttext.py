@@ -13,7 +13,7 @@ from sklearn.linear_model import LogisticRegression
 import random
 from xgboost import XGBClassifier
 
-def balance_data(data, method="undersample", seed=42):
+def balance_data(data, seed, method="undersample"):
     random.seed(seed)
 
     data_0 = [entry for entry in data if entry["target"] == 0]
@@ -50,7 +50,7 @@ def save_predictions_to_csv(test_data, y_proba_all, y_pred, filename="prediction
     df.to_csv(filename, index=False)
 
 
-def classifier_training(json_file, model_name, balance_method='undersample', seed=30, threshold=0.5):
+def classifier_training(json_file, model_name, seed, balance_method='undersample', threshold=0.5):
     random.seed(seed)
     np.random.seed(seed)
 
@@ -69,7 +69,7 @@ def classifier_training(json_file, model_name, balance_method='undersample', see
     train_data = [entry for entry in data if entry not in test_data]
 
     # équilibrage du training set
-    train_data = balance_data(train_data, method=balance_method, seed=seed)
+    train_data = balance_data(train_data, seed,  method=balance_method)
 
     # Conversion en matrices
     X_train = np.array([entry["embedding"] for entry in train_data])
@@ -145,12 +145,12 @@ def classifier_training(json_file, model_name, balance_method='undersample', see
 
 
 if __name__ == "__main__":
-    data_file_fasstext_old = 'json_fasttext/old/fasttext_sans_metadata_padded.json'
-    data_file_fasstext_new = 'json_fasttext/new/json_sans_metadonnee.json'
+    data_file_fasstext_new = 'json_fasttext/new/json_sansmetadata.json'
 
     # LR : "Logistic Regression"
     # RF : "Random Forest"
     # SVM : "SVM"
-    #
-    model_name = "XGBoost"
-    classifier_training(data_file_fasstext_old, model_name)
+    # XGBoost
+    model_name = "SVM"
+    seed = random.randint(1,10000)
+    classifier_training(data_file_fasstext_new, model_name, seed)

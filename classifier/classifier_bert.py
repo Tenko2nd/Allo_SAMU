@@ -1,5 +1,7 @@
 import os
 import random
+import csv
+from tqdm import tqdm
 
 import seaborn as sns
 import pandas as pd
@@ -14,7 +16,15 @@ from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from xgboost import XGBClassifier
+
 import joblib
+
+import warnings
+from sklearn.exceptions import ConvergenceWarning
+
+# Ignore uniquement les ConvergenceWarning
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+
 
 def plot_prediction_line_by_id(agg_df, threshold=0.5):
     # Ajoute la couleur selon la vraie classe
@@ -45,7 +55,7 @@ def extract_XY(dataset):
     return X, Y
 
 
-def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', threshold=0.4):
+def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', threshold=0.5):
     json_path = os.path.join(json_rep, json_file+".json")
     with open(json_path) as f:
         data = json.load(f)
@@ -83,7 +93,7 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
 
     train_data = filter_by_ids(data, ids_train)
     test_data = filter_by_ids(data, ids_test)
-    print("ID des cas dans le set de test :", ids_test)
+    # print("ID des cas dans le set de test :", ids_test)
 
     X_train, Y_train = extract_XY(train_data)
     X_test, Y_test = extract_XY(test_data)
@@ -91,22 +101,24 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
 
     # Entraînement du modèle
     if model_name == "SVM":
-        model = SVC(kernel='linear',
-                    probability=True,
+        model = SVC(kernel='poly',
+                    degree=3, # Added
+                    probability=True, # Added
                     random_state=seed)
     elif model_name == "Logistic Regression":
         model = LogisticRegression(random_state=seed,
-                                   max_iter=1000)
+                                   max_iter=10000,
+                                  solver = "liblinear") # Added
     elif model_name == "Random Forest":
-        model = RandomForestClassifier(n_estimators=100,
+        model = RandomForestClassifier(n_estimators=100, #Added
                                        max_depth=100,
-                                       random_state=seed)
+                                       random_state=seed,
+                                   max_features="sqrt") # Added
     elif model_name == "XGBoost":
-        model = XGBClassifier(dart_normalized_type = "forest",
+        model = XGBClassifier(booster="gbtree",
+                              device = "cuda",
                               learning_rate = 0.05,
-                              max_iterations = 50,
                               max_depth = 10,
-                              use_label_encoder=False,
                               eval_metric='logloss',
                               random_state=seed)
 
@@ -172,123 +184,141 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
     fpr_agg, tpr_agg, _ = roc_curve(y_true, y_score)
     roc_auc_agg = auc(fpr_agg, tpr_agg)
 
-    plt.figure(figsize=(8, 6))
-
-    plt.plot(fpr_test, tpr_test, color='orange', lw=2, label=f"Avant agrégation (AUC = {roc_auc_test:.2f})")
-    plt.plot(fpr_agg, tpr_agg, color='purple', lw=2, label=f"Après agrégation (AUC = {roc_auc_agg:.2f})")
-
-    plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Classifieur aléatoire')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('Taux de faux positifs', fontsize=12)
-    plt.ylabel('Sensibilité', fontsize=12)
-    plt.title('Courbe ROC - Comparaison avant/après agrégation', fontsize=14)
-    plt.legend(loc="lower right")
-    plt.grid(True)
-    plt.tight_layout()
+    # plt.figure(figsize=(8, 6))
+    #
+    # plt.plot(fpr_test, tpr_test, color='orange', lw=2, label=f"Avant agrégation (AUC = {roc_auc_test:.2f})")
+    # plt.plot(fpr_agg, tpr_agg, color='purple', lw=2, label=f"Après agrégation (AUC = {roc_auc_agg:.2f})")
+    #
+    # plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Classifieur aléatoire')
+    # plt.xlim([0.0, 1.0])
+    # plt.ylim([0.0, 1.05])
+    # plt.xlabel('Taux de faux positifs', fontsize=12)
+    # plt.ylabel('Sensibilité', fontsize=12)
+    # plt.title('Courbe ROC - Comparaison avant/après agrégation', fontsize=14)
+    # plt.legend(loc="lower right")
+    # plt.grid(True)
+    # plt.tight_layout()
 
     # -------------- Pour l'enregistrement des différents fichiers --------------
-    list_metrics = f"R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}"
-    output_dir_sub = f"{output_dir}/{json_file}/{list_metrics}_seed{seed}"
-    os.makedirs(output_dir_sub, exist_ok=True)
+    # list_metrics = f"R{int(recall_after*100)}_S{int(specificity_after*100)}_AUC{int(roc_auc_agg*100)}"
+    # output_dir_sub = f"{output_dir}/{json_file}/{list_metrics}_seed{seed}"
+    # os.makedirs(output_dir_sub, exist_ok=True)
     # ---------------------------------------------------------------------------
 
-    output_path_plot = os.path.join(output_dir_sub, f"{json_file}_courbe_ROC_{list_metrics}.png")
-    plt.savefig(output_path_plot, dpi=300)
-    plt.show()
-
-    plot_prediction_line_by_id(agg_df, threshold=threshold)
-    output_path_plot = os.path.join(output_dir_sub, f"{json_file}_droite_repartition_{list_metrics}.png")
-    plt.savefig(output_path_plot, dpi=300)
-    plt.show()
+    # output_path_plot = os.path.join(output_dir_sub, f"{json_file}_courbe_ROC_{list_metrics}.png")
+    # plt.savefig(output_path_plot, dpi=300)
+    # plt.show()
+    #
+    # plot_prediction_line_by_id(agg_df, threshold=threshold)
+    # output_path_plot = os.path.join(output_dir_sub, f"{json_file}_droite_repartition_{list_metrics}.png")
+    # plt.savefig(output_path_plot, dpi=300)
+    # plt.show()
 
 
     # ---- Matrice de confusion agrégée + affichage des 2 matrices ----
 
-    cm_after = confusion_matrix(y_true, y_pred)
-    labels = ['Non STEMI', 'STEMI']
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-
-    sns.heatmap(cm_before, annot=True, fmt='d', cmap='Oranges',
-                xticklabels=labels, yticklabels=labels, ax=axes[0], annot_kws={"size": 14}, vmin=0)
-    axes[0].set_title("Avant agrégation", fontsize=14)
-    axes[0].set_xlabel("Prédiction", fontsize=12)
-    axes[0].set_ylabel("Vérité terrain", fontsize=12)
-
-    text_before = (f"Sensibilité (TP / (TP + FN)) : {recall_before:.2f}"
-                   f"\nSpécificité (TN / (TN + FP)) : {specificity_before:.2f}"
-                    f"\nPrécision (TP / (TP + FP)) : {precision_before:.2f}"
-                   f"\nF1 Score : {f1_before:.2f}")
-    axes[0].text(0.5, -0.25, text_before, fontsize=12, ha='center', va='top', transform=axes[0].transAxes)
-
-    sns.heatmap(cm_after, annot=True, fmt='d', cmap='Purples',
-                xticklabels=labels, yticklabels=labels, ax=axes[1], annot_kws={"size": 14}, vmin=0)
-    axes[1].set_title("Après agrégation par id_cas", fontsize=14)
-    axes[1].set_xlabel("Prédiction", fontsize=12)
-    axes[1].set_ylabel("Vérité terrain", fontsize=12)
-
-    text_after = (f"Sensibilité (TP / (TP + FN)) : {recall_after:.2f}"
-                  f"\nSpécificité (TN / (TN + FP)) : {specificity_after:.2f}"
-                 f"\nPrécision (TP / (TP + FP)) : {precision_after:.2f}"
-
-                  f"\nF1 Score : {f1_after:.2f}")
-    axes[1].text(0.5, -0.25, text_after, fontsize=12, ha='center', va='top', transform=axes[1].transAxes)
-
-    plt.tight_layout()
-
-    output_path_matrix = os.path.join(output_dir_sub, f"{json_file}_confusion_matrix_{list_metrics}.png")
-
-    plt.savefig(output_path_matrix, dpi=300)  # dpi=300 pour une bonne qualité
-    plt.show()
+    # cm_after = confusion_matrix(y_true, y_pred)
+    # labels = ['Non STEMI', 'STEMI']
+    # fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    #
+    # sns.heatmap(cm_before, annot=True, fmt='d', cmap='Oranges',
+    #             xticklabels=labels, yticklabels=labels, ax=axes[0], annot_kws={"size": 14}, vmin=0)
+    # axes[0].set_title("Avant agrégation", fontsize=14)
+    # axes[0].set_xlabel("Prédiction", fontsize=12)
+    # axes[0].set_ylabel("Vérité terrain", fontsize=12)
+    #
+    # text_before = (f"Sensibilité (TP / (TP + FN)) : {recall_before:.2f}"
+    #                f"\nSpécificité (TN / (TN + FP)) : {specificity_before:.2f}"
+    #                 f"\nPrécision (TP / (TP + FP)) : {precision_before:.2f}"
+    #                f"\nF1 Score : {f1_before:.2f}")
+    # axes[0].text(0.5, -0.25, text_before, fontsize=12, ha='center', va='top', transform=axes[0].transAxes)
+    #
+    # sns.heatmap(cm_after, annot=True, fmt='d', cmap='Purples',
+    #             xticklabels=labels, yticklabels=labels, ax=axes[1], annot_kws={"size": 14}, vmin=0)
+    # axes[1].set_title("Après agrégation par id_cas", fontsize=14)
+    # axes[1].set_xlabel("Prédiction", fontsize=12)
+    # axes[1].set_ylabel("Vérité terrain", fontsize=12)
+    #
+    # text_after = (f"Sensibilité (TP / (TP + FN)) : {recall_after:.2f}"
+    #               f"\nSpécificité (TN / (TN + FP)) : {specificity_after:.2f}"
+    #              f"\nPrécision (TP / (TP + FP)) : {precision_after:.2f}"
+    #
+    #               f"\nF1 Score : {f1_after:.2f}")
+    # axes[1].text(0.5, -0.25, text_after, fontsize=12, ha='center', va='top', transform=axes[1].transAxes)
+    #
+    # plt.tight_layout()
+    #
+    # output_path_matrix = os.path.join(output_dir_sub, f"{json_file}_confusion_matrix_{list_metrics}.png")
+    #
+    # plt.savefig(output_path_matrix, dpi=300)  # dpi=300 pour une bonne qualité
+    # plt.show()
 
     # ********* Sauvegarde des proba de test dans un .csv ***************
 
     # On reprend toutes les probabilités pour les deux classes
-    proba_0 = Y_proba_all[:, 0]
-    proba_1 = Y_proba_all[:, 1]
-
-    # Nouveau DataFrame complet avec proba_0 et proba_1
-    df_test = pd.DataFrame({
-        "id_cas": id_cas_test,
-        "true_label": true_labels,
-        "proba_0": proba_0,
-        "proba_1": proba_1
-    })
-
-    # Agrégation par moyenne ou mediane
-    agg_df = df_test.groupby("id_cas").agg({
-        "proba_0": agg,  # ou "median"
-        "proba_1": agg,  # ou "median"
-        "true_label": "first"
-    }).reset_index()
+    # proba_0 = Y_proba_all[:, 0]
+    # proba_1 = Y_proba_all[:, 1]
+    #
+    # # Nouveau DataFrame complet avec proba_0 et proba_1
+    # df_test = pd.DataFrame({
+    #     "id_cas": id_cas_test,
+    #     "true_label": true_labels,
+    #     "proba_0": proba_0,
+    #     "proba_1": proba_1
+    # })
+    #
+    # # Agrégation par moyenne ou mediane
+    # agg_df = df_test.groupby("id_cas").agg({
+    #     "proba_0": agg,  # ou "median"
+    #     "proba_1": agg,  # ou "median"
+    #     "true_label": "first"
+    # }).reset_index()
 
     # Prédiction finale (selon proba_1 >= 0.5)
-    agg_df["pred_label"] = (agg_df["proba_1"] >= threshold).astype(int)
+    # agg_df["pred_label"] = (agg_df["proba_1"] >= threshold).astype(int)
+    #
+    # output_filename_csv = f"{json_file}_probabilities_{list_metrics}.csv"
+    # output_path_csv = os.path.join(output_dir_sub, output_filename_csv)
+    #
+    # agg_df.to_csv(output_path_csv, index=False)
+    #
+    # if model_name == "SVM":
+    #     joblib.dump(model, f"{output_dir_sub}/{json_file}_SVM_model_{list_metrics}.joblib")
+    # elif model_name == "Logistic Regression":
+    #     joblib.dump(model, f"{output_dir_sub}/{json_file}_LR_model_{list_metrics}.joblib")
+    # elif model_name == "Random Forest":
+    #     joblib.dump(model, f"{output_dir_sub}/{json_file}_RF_model_{list_metrics}.joblib")
+    #
+    #
+    # print(f"Résultats sauvegardés dans {output_dir_sub}")
 
-    output_filename_csv = f"{json_file}_probabilities_{list_metrics}.csv"
-    output_path_csv = os.path.join(output_dir_sub, output_filename_csv)
-
-    agg_df.to_csv(output_path_csv, index=False)
-
-    if model_name == "SVM":
-        joblib.dump(model, f"{output_dir_sub}/{json_file}_SVM_model_{list_metrics}.joblib")
-    elif model_name == "Logistic Regression":
-        joblib.dump(model, f"{output_dir_sub}/{json_file}_LR_model_{list_metrics}.joblib")
-    elif model_name == "Random Forest":
-        joblib.dump(model, f"{output_dir_sub}/{json_file}_RF_model_{list_metrics}.joblib")
-
-
-    print(f"Résultats sauvegardés dans {output_dir_sub}")
+    return  int(recall_after*100), int(specificity_after*100), int(precision_after*100), int(f1_after*100), int(roc_auc_agg*100)
 
 
 
 if __name__ == "__main__":
-    json_rep = "json_bert/camembertav2-base_raw_speaker_json"
-    data_file = 'camembertav2-base_sans_metadata_3'
-    # LR : "Logistic Regression"
-    # RF : "Random Forest"
-    # SVM : "SVM"
-    # XGBoost
-    seed = random.randint(1, 10000)
-    model = "XGBoost"
-    classifier_training(json_rep, data_file, model, seed)
+    # json_rep = "json_bert/DrBERT-7GB_raw_speaker_json"
+    # data_file = 'DrBERT-7GB_sans_metadata_3'
+
+    models = ["Random Forest",
+              "SVM"]
+
+    json_reps = {"json_bert/camembertav2-base_nlp_speaker_json":"camembertav2-base_sans_metadata_3"}
+
+    csv_file = "result_camembertv2_svm_rf_1.csv"
+
+    with open(csv_file, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["model", "json_rep", "json_file", "seed", "sensibility", "specificity", "precision", "f1_score", "auc_roc"])
+
+    with open(csv_file, mode='a', newline='') as file:
+        writer = csv.writer(file)
+
+        for model in models:
+            for json_rep, json_file in json_reps.items():
+                print(f"treating '{json_rep}' with model '{model}'")
+                for i in tqdm(range(200)):
+                    seed = random.randint(1, 100000)
+                    sens, spe, pre, f1, roc = classifier_training(json_rep, json_file, model, seed)
+
+                    writer.writerow([model, json_rep, json_file, seed, sens, spe, pre, f1, roc])
