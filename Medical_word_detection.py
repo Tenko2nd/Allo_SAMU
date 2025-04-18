@@ -1,40 +1,39 @@
 import os
+import re
 
-# Ensemble de tous les mots-clés médicaux liés à l'infarctus
+# 1. Charger le dictionnaire depuis un fichier .txt
+def charger_dictionnaire(chemin_dictionnaire):
+    with open(chemin_dictionnaire, 'r', encoding='utf-8') as f:
+        return [ligne.strip() for ligne in f if ligne.strip()]  # Supprime les espaces et lignes vides
 
-medical_keywords = {"douleur", "poitrine", "mal" , "respirer", "essoufflement", "sueur", "nausée", "vertige", "palpitation", "fatigue",
-                    "angoisse", "ischémie", "obstruction", "rupture", "plaque", "caillot", "thrombose", "tabac",
-                    "diabète", "hypertension", "cholestérol", "obésité", "obèse", "sédentarité", "alcool", "stress",
-                    "antécédent", "infarctus", "avc", "cardiaque", "serre","rétrosternale", "gauche","thoracique", "oppression",
-                    "coeur", "hta"}
+# Remplacez par le chemin de votre fichier dictionnaire.txt
+chemin_dictionnaire = "./dictionnaire_medicaux_300.txt"
+dictionnaire = charger_dictionnaire(chemin_dictionnaire)
 
+# 2. Dossier à analyser (remplacez par votre chemin)
+dossier = "./data"  # Dossier contenant les fichiers à analyser
 
-def detect_keywords(lemmas, keywords):
-    return sorted(set(lemma for lemma in lemmas if lemma in keywords))
+# 3. Fonction pour générer le vecteur binaire d'un fichier
+def generer_vecteur(texte, dictionnaire):
+    return [1 if re.search(rf"\b{re.escape(mot)}\b", texte, re.IGNORECASE) else 0
+            for mot in dictionnaire]
 
+# 4. Parcourir les fichiers et créer les vecteurs
+vecteurs_par_fichier = {}
 
-def analyze_folder(folder_path):
-    for filename in os.listdir(folder_path):
+for fichier in os.listdir(dossier):
+    chemin_fichier = os.path.join(dossier, fichier)
+    if os.path.isfile(chemin_fichier):
+        try:
+            with open(chemin_fichier, 'r', encoding='utf-8') as f:
+                texte = f.read()
+                vecteur = generer_vecteur(texte, dictionnaire)
+                vecteurs_par_fichier[fichier] = vecteur
+        except UnicodeDecodeError:
+            print(f"⚠️ Le fichier {fichier} n'est pas lisible (UTF-8).")
+        except Exception as e:
+            print(f"⚠️ Erreur avec {fichier} : {e}")
 
-        if filename.endswith(".txt"):
-            file_path = os.path.join(folder_path, filename)
-
-            with open(file_path, 'r', encoding='utf-8') as file:
-                content = file.read().lower()
-
-                lemmas = content.replace("\n", " ").split()
-
-            found_keywords = detect_keywords(lemmas, medical_keywords)
-
-            print(f"\n📄 Fichier : {filename}")
-
-            print("Mots-clés médicaux détectés :",
-                  ", ".join(found_keywords) if found_keywords else "Aucun mot-clé détecté.")
-
-
-# 📁 Remplace ce chemin par ton dossier contenant les fichiers .txt
-
-preprocessed_folder = r"data"
-
-analyze_folder(preprocessed_folder)
-
+# 5. Afficher les vecteurs
+for fichier, vecteur in vecteurs_par_fichier.items():
+    print(f"📄 {fichier} → {vecteur}")
