@@ -98,7 +98,6 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
     X_train, Y_train = extract_XY(train_data)
     X_test, Y_test = extract_XY(test_data)
 
-
     # Entraînement du modèle
     if model_name == "SVM":
         model = SVC(kernel='poly',
