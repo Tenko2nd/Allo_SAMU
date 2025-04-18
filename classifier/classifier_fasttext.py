@@ -137,34 +137,48 @@ def train_model(json_file, model_name, seed, threshold = 0.5):
 
     # ----- TOUS LES PLOTS ---------
 
-    # plot_prediction_distribution(test_data, y_proba_1, threshold=0.5)
+    plot_prediction_distribution(test_data, y_proba_1, threshold=0.5)
 
 
-    # cm = confusion_matrix(Y_test, Y_pred)
-    # classes = ['Non STEMI', 'STEMI']
-    # fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    #
-    # sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges',
-    #             xticklabels=classes, yticklabels=classes, ax=axes[0], annot_kws={"size": 14}, vmin=0)
-    # axes[0].set_title(f"Matrice de confusion ({model_name})", fontsize=14)
-    # axes[0].set_xlabel("Prédiction", fontsize=12)
-    # axes[0].set_ylabel("Vérité terrain", fontsize=12)
-    #
-    # text_before = (f"Sensibilité (TP / (TP + FN)) : {score:.2f}"
-    #                f"\nSpécificité (TN / (TN + FP)) : {specificity:.2f}"
-    #                 f"\nPrécision (TP / (TP + FP)) : {precision:.2f}"
-    #                f"\nF1 Score : {f1:.2f}")
-    # axes[0].text(0.5, -0.25, text_before, fontsize=12, ha='center', va='top', transform=axes[0].transAxes)
-    #
-    # axes[1].plot(fpr_test, tpr_test, color='darkorange', lw=2, label=f'AUC = {roc_auc:.2f}')
-    # axes[1].plot([0, 1], [0, 1], linestyle='--', color='gray', label='Classifieur aléatoire')
-    # axes[1].set_title(f"Courbe ROC ({model_name})", fontsize=14)
-    # axes[1].set_xlabel("Taux de Faux Positifs", fontsize=12)
-    # axes[1].set_ylabel("Taux de Vrais Positifs", fontsize=12)
-    # axes[1].legend(loc="lower right")
-    # axes[1].grid(True)
-    #
-    # plt.show()
+    cm = confusion_matrix(Y_test, Y_pred)
+    classes = ['Non STEMI', 'STEMI']
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges',
+                xticklabels=classes, yticklabels=classes, ax=axes[0], annot_kws={"size": 14}, vmin=0)
+    axes[0].set_title(f"Matrice de confusion ({model_name})", fontsize=14)
+    axes[0].set_xlabel("Prédiction", fontsize=12)
+    axes[0].set_ylabel("Vérité terrain", fontsize=12)
+
+    text_before = (f"Sensibilité (TP / (TP + FN)) : {score:.2f}"
+                   f"\nSpécificité (TN / (TN + FP)) : {specificity:.2f}"
+                    f"\nPrécision (TP / (TP + FP)) : {precision:.2f}"
+                   f"\nF1 Score : {f1:.2f}")
+    axes[0].text(0.5, -0.25, text_before, fontsize=12, ha='center', va='top', transform=axes[0].transAxes)
+
+    axes[1].plot(fpr_test, tpr_test, color='darkorange', lw=2, label=f'AUC = {roc_auc:.2f}')
+    axes[1].plot([0, 1], [0, 1], linestyle='--', color='gray', label='Classifieur aléatoire')
+    axes[1].set_title(f"Courbe ROC ({model_name})", fontsize=14)
+    axes[1].set_xlabel("Taux de Faux Positifs", fontsize=12)
+    axes[1].set_ylabel("Taux de Vrais Positifs", fontsize=12)
+    axes[1].legend(loc="lower right")
+    axes[1].grid(True)
+
+    plt.show()
+
+    # --------------- ENREGISTREMNT DES RESULTATS -------------------------
+    output_dir = None
+    if model_name == "SVM":
+        output_dir = "SVM"
+    elif model_name == "Logistic Regression":
+        output_dir = "LR"
+    elif model_name == "Random Forest":
+        output_dir = "RF"
+    elif model_name == "XGBoost":
+        output_dir = "XGBoost"
+
+    os.makedirs(output_dir, exist_ok=True)
+    plt.savefig()
 
     return int(score*100), int(specificity*100), int(precision*100), int(f1*100), int(roc_auc*100)
 
@@ -185,7 +199,7 @@ if __name__ == "__main__":
         writer = csv.writer(file)
 
         for classifier in classifiers:
-            for i in range (200):
+            for i in range (1):
                 seed = random.randint(1,10000)
                 recall, specificity, precision, f1, roc_auc = train_model(data_file_fasstext_new, classifier, seed)
                 writer.writerow([classifier, seed, recall, specificity, precision, f1, roc_auc])
