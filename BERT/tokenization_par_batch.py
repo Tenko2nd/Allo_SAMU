@@ -1,5 +1,5 @@
 from transformers import AutoTokenizer
-import camembert_constant as c
+import bert_constant as c
 
 
 def tokenize_text(file_path: str, tokenizer, verification: bool = False):

@@ -10,7 +10,7 @@ import json
 import csv
 from tqdm import tqdm # Import tqdm
 
-import camembert_constant as c
+import bert_constant as c
 from tokenization_par_batch import tokenize_text
 
 import warnings
@@ -133,32 +133,34 @@ def embeddings_to_json(data_bert_dir, file_list, tokenizer, model, type_metadata
 
 
 if __name__ == "__main__":
-    data_bert_dir = "data_bert_nlp_speaker"
+    list_data_bert_dir = ["data_bert_raw_speaker", "data_bert_raw_noSpeaker", "data_bert_nlp_speaker", "data_bert_nlp_noSpeaker",]
     csv_file_path = "../Cas-AnonymeFINAL.csv"
     list_type_metadata = ["A", "AS", "S", None]
-    list_model_name = ["Dr-BERT/DrBERT-7GB", "almanach/camembert-base", "flaubert/flaubert_large_cased", "almanach/camembertav2-base"]
+    list_model_name = ["Dr-BERT/DrBERT-7GB", "almanach/camembert-base", "flaubert/flaubert_large_cased", "almanach/camembertav2-base"] #["Dr-BERT/DrBERT-7GB", "almanach/camembert-base", "flaubert/flaubert_large_cased", "almanach/camembertav2-base"]
 
     use_gpu()
 
     metadata_dict = load_metadata_csv(csv_file_path)
 
-    for model_name in list_model_name:
-        file_list = [f for f in os.listdir(data_bert_dir) if f.endswith(".txt")]
+    for data_bert_dir in list_data_bert_dir:
 
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = TFAutoModel.from_pretrained(model_name, from_pt=True)
+        for model_name in list_model_name:
+            file_list = [f for f in os.listdir(data_bert_dir) if f.endswith(".txt")]
 
-        for type_metadata in list_type_metadata:
-            print(f"\nProcessing type {type_metadata} for model {model_name}")
-            json_output = embeddings_to_json(data_bert_dir=data_bert_dir, file_list=file_list, tokenizer=tokenizer, model=model, type_metadata=type_metadata)
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = TFAutoModel.from_pretrained(model_name, from_pt=True)
 
-            output_dir = f"{model_name.split('/')[-1]}_{('_').join(data_bert_dir.split('_')[-2:])}_json"
-            json_file = f"{model_name.split('/')[-1]}_{type_metadata if type_metadata is not None else 'sans_metadata'}_{c.CONTEXT_LEN}.json"
+            for type_metadata in list_type_metadata:
+                print(f"\nProcessing type {type_metadata} for model {model_name}")
+                json_output = embeddings_to_json(data_bert_dir=data_bert_dir, file_list=file_list, tokenizer=tokenizer, model=model, type_metadata=type_metadata)
 
-            if not os.path.isdir(output_dir):
-                os.mkdir(output_dir)
-                print(f"\nCreated directory {output_dir}")
+                output_dir = f"{model_name.split('/')[-1]}_{('_').join(data_bert_dir.split('_')[-2:])}_json"
+                json_file = f"{model_name.split('/')[-1]}_{type_metadata if type_metadata is not None else 'sans_metadata'}_{c.CONTEXT_LEN}.json"
 
-            with open(f"{output_dir}/{json_file}", 'w') as f:
-                json.dump(json_output, f, indent=2)
-            print(f"\nCombined JSON output saved to {output_dir}/{json_file}")
+                if not os.path.isdir(output_dir):
+                    os.mkdir(output_dir)
+                    print(f"\nCreated directory {output_dir}")
+
+                with open(f"{output_dir}/{json_file}", 'w') as f:
+                    json.dump(json_output, f, indent=2)
+                print(f"\nCombined JSON output saved to {output_dir}/{json_file}")

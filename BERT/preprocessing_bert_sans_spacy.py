@@ -1,9 +1,12 @@
 import os
 import docx
 import re
+from tqdm import tqdm
+
+import bert_constant as c
 
 # === Extraction du contenu du .docx et insertion des balises SEP ===
-def docx_to_list(record_ID, record_dir, option):
+def docx_to_list(record_ID, record_dir):
     doc = docx.Document(record_dir + record_ID)
 
     allText = [docpara.text for docpara in doc.paragraphs]
@@ -13,18 +16,10 @@ def docx_to_list(record_ID, record_dir, option):
     cleaned_allText = []
     for paragraph_text in allText:
         paragraph_text = paragraph_text.replace("1-", "")
-
-        if option == "avec_speaker":
-            paragraph_text = paragraph_text.replace('SPEAKER_01', '[SEP]\nDocteur:')
-            paragraph_text = paragraph_text.replace('SPEAKER_00', '[SEP]\nInterlocuteur:')
-            paragraph_text = paragraph_text.replace('SPEAKER_02', '[SEP]\nInterlocuteur:')
-            paragraph_text = paragraph_text.replace('SPEAKER_03', '[SEP]\nInterlocuteur:')
-        elif option == "sans_speaker":
-            paragraph_text = paragraph_text.replace('SPEAKER_01', '[SEP]\n')
-            paragraph_text = paragraph_text.replace('SPEAKER_00', '[SEP]\n')
-            paragraph_text = paragraph_text.replace('SPEAKER_02', '[SEP]\n')
-            paragraph_text = paragraph_text.replace('SPEAKER_03', '[SEP]\n')
-
+        paragraph_text = paragraph_text.replace('SPEAKER_01', '[SEP]\nDocteur:')
+        paragraph_text = paragraph_text.replace('SPEAKER_00', '[SEP]\nInterlocuteur:')
+        paragraph_text = paragraph_text.replace('SPEAKER_02', '[SEP]\nInterlocuteur:')
+        paragraph_text = paragraph_text.replace('SPEAKER_03', '[SEP]\nInterlocuteur:')
         cleaned_allText.append(paragraph_text)
 
     if cleaned_allText:
@@ -34,10 +29,10 @@ def docx_to_list(record_ID, record_dir, option):
     return cleaned_allText
 
 # === Traitement simple sans SpaCy ===
-def final_words(all_text, filename, option):
+def final_words(all_text, filename):
     cleaned_text = []
-    data_path = "data_bert"
-    SEPARATEUR = "[SEP]"
+    data_path = "data_bert_raw"
+    SEPARATEUR = c.TEXT_FILE_SEPARATOR
     spec_char = []
 
     os.makedirs(data_path, exist_ok=True)
@@ -86,9 +81,6 @@ def final_words(all_text, filename, option):
                 is_start_of_line = True
                 continue
 
-            if option == "sans_speaker" and word.lower() in ["docteur", "interlocuteur", ":"]:
-                continue
-
             if not is_start_of_line:
                 outfile.write(" ")
 
@@ -101,17 +93,12 @@ def final_words(all_text, filename, option):
 if __name__ == "__main__":
     record_dir = r'C:\Users\casserma\Documents\Data\Retranscriptions Anonymes_FINAL/' # A modifier avec le dossier où se trouvent les enregistrements .docx
 
-
-
     filenames = os.listdir(record_dir)
-    option = "sans_speaker"
 
-    for filename in filenames:
+    for filename in tqdm(filenames):
         if filename.endswith(".docx"):
             record_ID = filename
 
-            all_text = docx_to_list(record_ID, record_dir,option)
-            final_word_list = final_words(all_text, filename, option)
+            all_text = docx_to_list(record_ID, record_dir)
+            final_word_list = final_words(all_text, filename)
 
-            # print(final_word_list)
-            # print("-" * 50)
