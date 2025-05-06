@@ -34,19 +34,23 @@ def use_gpu():
     else:
         print("No GPU detected. TensorFlow will use CPU.")
 
-def get_embeddings_from_batches(batched_input_ids: List[List[int]], batched_attention_masks: List[List[int]], model):
+def get_embeddings_for_file_batched(all_input_ids: List[List[int]], all_attention_masks: List[List[int]], model):
     """
-    Génère les embeddings BERT pour une liste de batches tokenisés.
+    Génère les embeddings BERT pour tous les batches d'un fichier en une seule passe modèle.
     """
-    batch_embeddings = []
-    for input_ids_batch, attention_mask_batch in zip(batched_input_ids, batched_attention_masks):
-        input_ids_tensor = tf.constant([input_ids_batch])
-        attention_mask_tensor = tf.constant([attention_mask_batch])
-        outputs = model(input_ids_tensor, attention_mask=attention_mask_tensor)
-        last_hidden_states = outputs.last_hidden_state
-        cls_embedding = last_hidden_states[:, 0, :].numpy()
-        batch_embeddings.append(cls_embedding)
-    return batch_embeddings
+    if not all_input_ids: # Vérifier si la liste est vide
+        return []
+
+    input_ids_tensor = tf.constant(all_input_ids, dtype=tf.int32)
+    attention_mask_tensor = tf.constant(all_attention_masks, dtype=tf.int32)
+
+    # Appel unique au modèle pour tous les batches
+    outputs = model(input_ids_tensor, attention_mask=attention_mask_tensor)
+    last_hidden_states = outputs.last_hidden_state
+
+    # Extraire les embeddings [CLS] pour chaque élément du batch
+    cls_embeddings = last_hidden_states[:, 0, :].numpy() # Shape: (nombre_de_batches, hidden_size)
+    return list(cls_embeddings) # Retourne une liste d'arrays numpy, un par batch original
 
 
 def load_metadata_csv(csv_file_path: str) -> dict[str, dict[str, any]]:
@@ -103,28 +107,30 @@ def embeddings_to_json(data_bert_dir, file_list, tokenizer, model, type_metadata
 
         batched_input_ids, batched_attention_masks = tokenize_text(file_path, tokenizer, verification=False)
 
-        if batched_input_ids is not None:
-            embeddings_list = get_embeddings_from_batches(batched_input_ids, batched_attention_masks, model)
+        if batched_input_ids is not None and batched_input_ids:  # Vérifier aussi que ce n'est pas vide
+            # Appel à la nouvelle fonction
+            embeddings_list_np = get_embeddings_for_file_batched(batched_input_ids, batched_attention_masks, model)
 
             ID_Patient = file_name.split("_")[0]
 
-            Target = 1 if ID_Patient[0] in ['A', 'C'] else 0 if ID_Patient[0] in ['B', 'D'] else None
+            Target = 1 if ID_Patient[0] in ['A', 'C', 'W', 'Y'] else 0 if ID_Patient[0] in ['B', 'D', 'X', 'Z'] else None
             if Target is None:
                 print(f"Warning: Unknown ID_Patient prefix: {ID_Patient[0]}. Target set to None.")
 
             if type_metadata is not None:
                 normalized_metadata = get_normalized_metadata(ID_Patient, metadata_dict, type_metadata)
 
-            for i, embeddings in enumerate(embeddings_list):
-                embeddings = embeddings.flatten()
+            for i, embeddings_np in enumerate(embeddings_list_np):
                 if type_metadata is not None:
-                    embeddings = np.concatenate((embeddings, normalized_metadata))
+                    final_embeddings = np.concatenate((embeddings_np, normalized_metadata))
+                else:
+                    final_embeddings = embeddings_np
 
                 batch_json = {
                     "id_cas": ID_Patient,
                     "batch": i + 1,
                     "target": Target,
-                    "embedding": embeddings.tolist()
+                    "embedding": final_embeddings.tolist()
                 }
                 json_output.append(batch_json)
         else:
@@ -133,11 +139,11 @@ def embeddings_to_json(data_bert_dir, file_list, tokenizer, model, type_metadata
 
 
 if __name__ == "__main__":
-    list_data_bert_dir = ["data_bert_raw_speaker", "data_bert_raw_noSpeaker", "data_bert_nlp_speaker", "data_bert_nlp_noSpeaker",]
-    csv_file_path = "../Cas-AnonymeFINAL.csv"
+    list_data_bert_dir = ["data_bert_nlp", "data_bert_raw"]
+    csv_file_path = "../Données_finales.csv"
     list_type_metadata = ["A", "AS", "S", None]
-    list_model_name = ["Dr-BERT/DrBERT-7GB", "almanach/camembert-base", "flaubert/flaubert_large_cased", "almanach/camembertav2-base"] #["Dr-BERT/DrBERT-7GB", "almanach/camembert-base", "flaubert/flaubert_large_cased", "almanach/camembertav2-base"]
-
+    # ["almanach/camembertav2-base", "flaubert/flaubert_large_cased", "almanach/camembert-base", "Dr-BERT/DrBERT-7GB"] ordre de qualité décroissant après test
+    list_model_name = ["flaubert/flaubert_large_cased", "almanach/camembertav2-base"] # Les deux meilleurs
     use_gpu()
 
     metadata_dict = load_metadata_csv(csv_file_path)
@@ -154,7 +160,7 @@ if __name__ == "__main__":
                 print(f"\nProcessing type {type_metadata} for model {model_name}")
                 json_output = embeddings_to_json(data_bert_dir=data_bert_dir, file_list=file_list, tokenizer=tokenizer, model=model, type_metadata=type_metadata)
 
-                output_dir = f"{model_name.split('/')[-1]}_{('_').join(data_bert_dir.split('_')[-2:])}_json"
+                output_dir = f"{model_name.split('/')[-1]}_{('_').join(data_bert_dir.split('_')[-1:])}_json"
                 json_file = f"{model_name.split('/')[-1]}_{type_metadata if type_metadata is not None else 'sans_metadata'}_{c.CONTEXT_LEN}.json"
 
                 if not os.path.isdir(output_dir):

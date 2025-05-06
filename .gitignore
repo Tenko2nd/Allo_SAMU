@@ -1,5 +1,5 @@
 *.ipynb
-Cas-AnonymeFINAL.csv
+Données_finales.csv
 BERT/data*
 BERT/*_json/
 *.json
