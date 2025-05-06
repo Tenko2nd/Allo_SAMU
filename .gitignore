@@ -5,6 +5,10 @@ BERT/*_json/
 *.json
 *.zip
 
+*.png
+*.joblib
+*.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
