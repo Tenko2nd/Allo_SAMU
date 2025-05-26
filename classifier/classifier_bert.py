@@ -14,9 +14,12 @@ from collections import defaultdict
 # Modèles de classification :
 from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, RidgeClassifier, Ridge
 from xgboost import XGBClassifier
-
+from sklearn.naive_bayes import GaussianNB
+from scipy.special import expit
+from catboost import CatBoostClassifier
+from sklearn.ensemble import AdaBoostClassifier
 import joblib
 
 import warnings
@@ -60,7 +63,15 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
     with open(json_path) as f:
         data = json.load(f)
 
-    output_dir = {"SVM": "SVM", "Logistic Regression": "LR", "Random Forest": "RF", "XGBoost": "XGBoost"}.get(model_name)
+
+    output_dir = {"SVM": "SVM",
+                  "Naive Bayes" : "NB",
+                  "Logistic Regression": "LR",
+                  "Random Forest": "RF",
+                  "XGBoost": "XGBoost",
+                  "Ridge" : "RidgeClassifier",
+                  "Catboost" : "Catboost",
+                  "AdaBoost" : "AdaBoost"}.get(model_name)
     os.makedirs(output_dir, exist_ok=True)
 
 
@@ -101,7 +112,7 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
     # Entraînement du modèle
     if model_name == "SVM":
         model = SVC(kernel='poly',
-                    degree=3, # Added
+                    degree=4, # Added
                     probability=True, # Added
                     random_state=seed)
     elif model_name == "Logistic Regression":
@@ -109,10 +120,10 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
                                    max_iter=10000,
                                   solver = "liblinear") # Added
     elif model_name == "Random Forest":
-        model = RandomForestClassifier(n_estimators=100, #Added
-                                       max_depth=100,
+        model = RandomForestClassifier(max_depth=100,
+                                        criterion="entropy", #default: "gini"
                                        random_state=seed,
-                                   max_features="sqrt") # Added
+                                        max_features="sqrt") # Added
     elif model_name == "XGBoost":
         model = XGBClassifier(booster="gbtree",
                               device = "cuda",
@@ -121,11 +132,32 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
                               eval_metric='logloss',
                               random_state=seed)
 
+    elif model_name == "Catboost":
+        model = CatBoostClassifier(task_type = "GPU",
+                                   iterations = 100,
+                                   depth = 6)
+
+    elif model_name == "Naive Bayes":
+        model = GaussianNB()
+
+    elif model_name == "Ridge":
+        model = RidgeClassifier(positive=True, random_state=seed)
+
+    elif model_name == "AdaBoost":
+        model = AdaBoostClassifier(n_estimators=100, random_state=seed)
+
     model.fit(X_train, Y_train)
 
     Y_pred = model.predict(X_test)
-    Y_proba_all = model.predict_proba(X_test)
-    Y_proba = Y_proba_all[:,1]
+    if model_name == "Ridge":
+        scores = model.decision_function(X_test)
+        proba_pos = expit(scores)
+        proba_neg = 1 - proba_pos
+        Y_proba_all = np.column_stack([proba_neg, proba_pos])  # shape: (n_samples, 2)
+    else:
+        Y_proba_all = model.predict_proba(X_test)
+
+    Y_proba = Y_proba_all[:, 1]
 
 
     # ---------- Evaluation --------------
@@ -161,6 +193,11 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
     # ---- Seuil à 0.5 pour faire la prédiction binaire par id_cas ----
     agg_df["pred_label"] = (agg_df["proba"] >= threshold).astype(int)
 
+    # ---- à retirer si on compte les valeurs ambigues -------
+    ambiguous_mask = agg_df["proba"].between(0.45, 0.55)
+    nb_removed = ambiguous_mask.sum()
+    agg_df = agg_df[~ambiguous_mask]
+
     # ---- Évaluation par ID ----
     y_true = agg_df["true_label"]
     y_pred = agg_df["pred_label"]
@@ -170,10 +207,11 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
     # ---- Métriques ----
 
     recall_after = recall_score(y_true, y_pred)
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    specificity_after = tn / (tn + fp)
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+
     f1_after = f1_score(y_true, y_pred)
-    precision_after = tp / (tp + fp)
+    specificity_after = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+    precision_after = tp / (tp + fp) if (tp + fp) > 0 else 0.0
 
     # ----- Courbe ROC + affichage des 2 courbes --------
 
@@ -255,27 +293,27 @@ def classifier_training(json_rep, json_file, model_name, seed, agg = 'median', t
     # ********* Sauvegarde des proba de test dans un .csv ***************
 
     # On reprend toutes les probabilités pour les deux classes
-    # proba_0 = Y_proba_all[:, 0]
-    # proba_1 = Y_proba_all[:, 1]
-    #
-    # # Nouveau DataFrame complet avec proba_0 et proba_1
-    # df_test = pd.DataFrame({
-    #     "id_cas": id_cas_test,
-    #     "true_label": true_labels,
-    #     "proba_0": proba_0,
-    #     "proba_1": proba_1
-    # })
-    #
-    # # Agrégation par moyenne ou mediane
-    # agg_df = df_test.groupby("id_cas").agg({
-    #     "proba_0": agg,  # ou "median"
-    #     "proba_1": agg,  # ou "median"
-    #     "true_label": "first"
-    # }).reset_index()
+    proba_0 = Y_proba_all[:, 0]
+    proba_1 = Y_proba_all[:, 1]
+
+    # Nouveau DataFrame complet avec proba_0 et proba_1
+    df_test = pd.DataFrame({
+        "id_cas": id_cas_test,
+        "true_label": true_labels,
+        "proba_0": proba_0,
+        "proba_1": proba_1
+    })
+
+    # Agrégation par moyenne ou mediane
+    agg_df = df_test.groupby("id_cas").agg({
+        "proba_0": agg,  # ou "median"
+        "proba_1": agg,  # ou "median"
+        "true_label": "first"
+    }).reset_index()
 
     # Prédiction finale (selon proba_1 >= 0.5)
-    # agg_df["pred_label"] = (agg_df["proba_1"] >= threshold).astype(int)
-    #
+    agg_df["pred_label"] = (agg_df["proba_1"] >= threshold).astype(int)
+
     # output_filename_csv = f"{json_file}_probabilities_{list_metrics}.csv"
     # output_path_csv = os.path.join(output_dir_sub, output_filename_csv)
     #
@@ -299,12 +337,10 @@ if __name__ == "__main__":
     # json_rep = "json_bert/DrBERT-7GB_raw_speaker_json"
     # data_file = 'DrBERT-7GB_sans_metadata_3'
 
-    models = ["Random Forest",
-              "SVM"]
+    models = ["Random Forest"]
 
-    json_reps = {"json_bert/camembertav2-base_nlp_speaker_json":"camembertav2-base_sans_metadata_3"}
-
-    csv_file = "result_camembertv2_svm_rf_1.csv"
+    json_reps = {"json_bert/norm_corr_json":"corr_camembertav2-base_nlp"}
+    csv_file = "result_camembertav2_corr_rf.csv"
 
     with open(csv_file, mode='w', newline='') as file:
         writer = csv.writer(file)
@@ -316,7 +352,7 @@ if __name__ == "__main__":
         for model in models:
             for json_rep, json_file in json_reps.items():
                 print(f"treating '{json_rep}' with model '{model}'")
-                for i in tqdm(range(200)):
+                for i in tqdm(range(400)):
                     seed = random.randint(1, 100000)
                     sens, spe, pre, f1, roc = classifier_training(json_rep, json_file, model, seed)
 

@@ -4,6 +4,7 @@ from collections import Counter
 
 import seaborn as sns
 import pandas as pd
+from scipy.special import expit
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report, recall_score, confusion_matrix, f1_score, roc_auc_score, \
@@ -14,6 +15,9 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 import random
+from sklearn.naive_bayes import GaussianNB
+
+from sklearn.linear_model import LogisticRegression, RidgeClassifier, Ridge
 
 from tqdm import tqdm
 from xgboost import XGBClassifier
@@ -46,6 +50,8 @@ def plot_prediction_distribution(test_data, y_proba, threshold=0.5):
     plt.xlim(0, 1)
     plt.legend()
     plt.tight_layout()
+    plt.subplots_adjust(bottom=0.25)  # Laisse plus de place en bas
+
     plt.show()
 
 def load_and_split_data(json_file, seed, test_ratio=0.15):
@@ -89,6 +95,26 @@ def prepare_arrays(data):
 
 
 def train_model(json_file, model_name, seed, threshold = 0.5):
+
+    # --------------- ENREGISTREMNT DES RESULTATS -------------------------
+    output_dir = None
+    if model_name == "SVM":
+        output_dir = "SVM"
+    elif model_name == "Logistic Regression":
+        output_dir = "LR"
+    elif model_name == "Random Forest":
+        output_dir = "RF"
+    elif model_name == "XGBoost":
+        output_dir = "XGBoost"
+    elif model_name == "Naive Bayes":
+        output_dir = "NB"
+    elif model_name == "Ridge":
+        output_dir = "Ridge"
+
+    os.makedirs(output_dir, exist_ok=True)
+    plot_path = os.path.join(output_dir, f"roc_confusion_{model_name.replace(' ', '_')}.png")
+
+
     # Chargement et équilibrage
     train_data, test_data = load_and_split_data(json_file, seed)
 
@@ -116,10 +142,24 @@ def train_model(json_file, model_name, seed, threshold = 0.5):
                               max_depth = 10,
                               eval_metric='logloss',
                               random_state=seed)
+    elif model_name == "Naive Bayes":
+        model = GaussianNB()
+
+
+    elif model_name == "Ridge":
+        model = RidgeClassifier(random_state=seed)
 
     model.fit(X_train, y_train)
 
-    Y_proba_all = model.predict_proba(X_test)
+    Y_pred = model.predict(X_test)
+    if model_name == "Ridge":
+        scores = model.decision_function(X_test)
+        proba_pos = expit(scores)
+        proba_neg = 1 - proba_pos
+        Y_proba_all = np.column_stack([proba_neg, proba_pos])  # shape: (n_samples, 2)
+    else:
+        Y_proba_all = model.predict_proba(X_test)
+
     Y_proba = Y_proba_all[:, 1]
     Y_pred = (Y_proba >= threshold).astype(int)
     y_proba_1 = [proba[1] for proba in Y_proba_all]
@@ -137,59 +177,48 @@ def train_model(json_file, model_name, seed, threshold = 0.5):
 
     # ----- TOUS LES PLOTS ---------
 
-    plot_prediction_distribution(test_data, y_proba_1, threshold=0.5)
-
-
-    cm = confusion_matrix(Y_test, Y_pred)
-    classes = ['Non STEMI', 'STEMI']
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges',
-                xticklabels=classes, yticklabels=classes, ax=axes[0], annot_kws={"size": 14}, vmin=0)
-    axes[0].set_title(f"Matrice de confusion ({model_name})", fontsize=14)
-    axes[0].set_xlabel("Prédiction", fontsize=12)
-    axes[0].set_ylabel("Vérité terrain", fontsize=12)
-
-    text_before = (f"Sensibilité (TP / (TP + FN)) : {score:.2f}"
-                   f"\nSpécificité (TN / (TN + FP)) : {specificity:.2f}"
-                    f"\nPrécision (TP / (TP + FP)) : {precision:.2f}"
-                   f"\nF1 Score : {f1:.2f}")
-    axes[0].text(0.5, -0.25, text_before, fontsize=12, ha='center', va='top', transform=axes[0].transAxes)
-
-    axes[1].plot(fpr_test, tpr_test, color='darkorange', lw=2, label=f'AUC = {roc_auc:.2f}')
-    axes[1].plot([0, 1], [0, 1], linestyle='--', color='gray', label='Classifieur aléatoire')
-    axes[1].set_title(f"Courbe ROC ({model_name})", fontsize=14)
-    axes[1].set_xlabel("Taux de Faux Positifs", fontsize=12)
-    axes[1].set_ylabel("Taux de Vrais Positifs", fontsize=12)
-    axes[1].legend(loc="lower right")
-    axes[1].grid(True)
-
-    plt.show()
-
-    # --------------- ENREGISTREMNT DES RESULTATS -------------------------
-    output_dir = None
-    if model_name == "SVM":
-        output_dir = "SVM"
-    elif model_name == "Logistic Regression":
-        output_dir = "LR"
-    elif model_name == "Random Forest":
-        output_dir = "RF"
-    elif model_name == "XGBoost":
-        output_dir = "XGBoost"
-
-    os.makedirs(output_dir, exist_ok=True)
-    plt.savefig()
+    # plot_prediction_distribution(test_data, y_proba_1, threshold=0.5)
+    #
+    #
+    # cm = confusion_matrix(Y_test, Y_pred)
+    # classes = ['Non STEMI', 'STEMI']
+    # fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    #
+    # sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges',
+    #             xticklabels=classes, yticklabels=classes, ax=axes[0], annot_kws={"size": 14}, vmin=0)
+    # axes[0].set_title(f"Matrice de confusion ({model_name})", fontsize=14)
+    # axes[0].set_xlabel("Prédiction", fontsize=12)
+    # axes[0].set_ylabel("Vérité terrain", fontsize=12)
+    #
+    # text_before = (f"Sensibilité (TP / (TP + FN)) : {score:.2f}"
+    #                f"\nSpécificité (TN / (TN + FP)) : {specificity:.2f}"
+    #                 f"\nPrécision (TP / (TP + FP)) : {precision:.2f}"
+    #                f"\nF1 Score : {f1:.2f}")
+    # # Affiche les scores sous la matrice de confusion
+    # axes[0].text(0.5, -0.15, text_before, fontsize=12, ha='center', va='top', transform=axes[0].transAxes)
+    #
+    # axes[1].plot(fpr_test, tpr_test, color='darkorange', lw=2, label=f'AUC = {roc_auc:.2f}')
+    # axes[1].plot([0, 1], [0, 1], linestyle='--', color='gray', label='Classifieur aléatoire')
+    # axes[1].set_title(f"Courbe ROC ({model_name})", fontsize=14)
+    # axes[1].set_xlabel("Taux de Faux Positifs", fontsize=12)
+    # axes[1].set_ylabel("Taux de Vrais Positifs", fontsize=12)
+    # axes[1].legend(loc="lower right")
+    # axes[1].grid(True)
+    #
+    # plt.show()
+    #
+    # plt.savefig(plot_path)
 
     return int(score*100), int(specificity*100), int(precision*100), int(f1*100), int(roc_auc*100)
 
 
 if __name__ == "__main__":
 
-    classifiers = ["Logistic Regression", "Random Forest", "SVM", "XGBoost"] # SVM : plus prometteur ?
+    classifiers = ["Ridge"]
     data_file_fasstext_new = 'json_fasttext/new/json_sansmetadata.json'
 
 
-    csv_file = "result_tfidf.csv"
+    csv_file = "result_tfidf_ridge.csv"
 
     with open(csv_file, mode='w', newline='') as file:
         writer = csv.writer(file)
@@ -199,7 +228,7 @@ if __name__ == "__main__":
         writer = csv.writer(file)
 
         for classifier in classifiers:
-            for i in range (1):
+            for i in range (400):
                 seed = random.randint(1,10000)
                 recall, specificity, precision, f1, roc_auc = train_model(data_file_fasstext_new, classifier, seed)
                 writer.writerow([classifier, seed, recall, specificity, precision, f1, roc_auc])
