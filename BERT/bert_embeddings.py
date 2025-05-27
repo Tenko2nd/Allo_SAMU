@@ -88,7 +88,7 @@ def get_normalized_metadata(patient_id: str, metadata: dict[str, dict[str, any]]
             if type_metadata == "AS":
                 return np.array([normalized_age, sexe], dtype=np.float32)
             else:
-                print(f"Error mtadata type unknown : {type_metadata}")
+                print(f"Error metadata type unknown : {type_metadata}")
                 return np.array([0, 0], dtype=np.float32)
 
         except (ValueError, KeyError) as e:
@@ -113,6 +113,8 @@ def embeddings_to_json(data_bert_dir, file_list, tokenizer, model, type_metadata
 
             ID_Patient = file_name.split("_")[0]
 
+            patient_metadata = metadata_dict.get(ID_Patient.lower())
+
             Target = 1 if ID_Patient[0] in ['A', 'C', 'W', 'Y'] else 0 if ID_Patient[0] in ['B', 'D', 'X', 'Z'] else None
             if Target is None:
                 print(f"Warning: Unknown ID_Patient prefix: {ID_Patient[0]}. Target set to None.")
@@ -121,6 +123,13 @@ def embeddings_to_json(data_bert_dir, file_list, tokenizer, model, type_metadata
                 normalized_metadata = get_normalized_metadata(ID_Patient, metadata_dict, type_metadata)
 
             for i, embeddings_np in enumerate(embeddings_list_np):
+                # Normalisation L2 de l'embedding BERT
+                norm = np.linalg.norm(embeddings_np)
+                if norm > 1e-9: # Éviter la division par zéro pour les embeddings nuls (très improbable)
+                    embeddings_np = embeddings_np / norm
+                else:
+                    embeddings_np = embeddings_np # Garder l'embedding nul tel quel
+
                 if type_metadata is not None:
                     final_embeddings = np.concatenate((embeddings_np, normalized_metadata))
                 else:
@@ -130,6 +139,8 @@ def embeddings_to_json(data_bert_dir, file_list, tokenizer, model, type_metadata
                     "id_cas": ID_Patient,
                     "batch": i + 1,
                     "target": Target,
+                    "sexe":patient_metadata['Sexe'].upper(),
+                    "age":int(patient_metadata['Age']),
                     "embedding": final_embeddings.tolist()
                 }
                 json_output.append(batch_json)
@@ -140,7 +151,7 @@ def embeddings_to_json(data_bert_dir, file_list, tokenizer, model, type_metadata
 
 if __name__ == "__main__":
     list_data_bert_dir = ["data_bert_nlp", "data_bert_raw"]
-    csv_file_path = "../Données_finales.csv"
+    csv_file_path = "../data/Données_finales.csv"
     list_type_metadata = ["A", "AS", "S", None]
     # ["almanach/camembertav2-base", "flaubert/flaubert_large_cased", "almanach/camembert-base", "Dr-BERT/DrBERT-7GB"] ordre de qualité décroissant après test
     list_model_name = ["flaubert/flaubert_large_cased", "almanach/camembertav2-base"] # Les deux meilleurs
@@ -160,7 +171,7 @@ if __name__ == "__main__":
                 print(f"\nProcessing type {type_metadata} for model {model_name}")
                 json_output = embeddings_to_json(data_bert_dir=data_bert_dir, file_list=file_list, tokenizer=tokenizer, model=model, type_metadata=type_metadata)
 
-                output_dir = f"{model_name.split('/')[-1]}_{('_').join(data_bert_dir.split('_')[-1:])}_json"
+                output_dir = f"add_{model_name.split('/')[-1]}_{('_').join(data_bert_dir.split('_')[-1:])}_json"
                 json_file = f"{model_name.split('/')[-1]}_{type_metadata if type_metadata is not None else 'sans_metadata'}_{c.CONTEXT_LEN}.json"
 
                 if not os.path.isdir(output_dir):

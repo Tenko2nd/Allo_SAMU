@@ -106,7 +106,7 @@ def final_words(all_text, nlp, filename):
 
 
 if __name__ == "__main__":
-    record_dir = r'C:\Users\casserma\Documents\Data\Retranscriptions Anonymes_FINAL/' # A modifier avec le dossier où se trouvent les enregistrements .docx
+    record_dir = r"../data/Retranscriptions/" # A modifier avec le dossier où se trouvent les enregistrements .docx
 
     nlp = spacy.load("fr_core_news_lg")
 
