@@ -4,6 +4,14 @@ import spacy
 
 #import spacy.cli
 
+import spacy.cli
+
+try:
+    nlp = spacy.load("fr_core_news_lg")
+except OSError:
+    spacy.cli.download("fr_core_news_lg")
+    nlp = spacy.load("fr_core_news_lg")
+
 
 
 def docx_to_list(record_ID, record_dir):
@@ -30,7 +38,7 @@ def docx_to_list(record_ID, record_dir):
 
     return stopwords, caracteres, allText
 
-
+#nettoyage et lemmatization
 def clean_and_lemmatize(text, caracteres, stopwords, nlp):
     """
     reformate le texte en token et les lemmatize
@@ -83,7 +91,7 @@ def final_words(all_text, caracteres, stopwords, nlp, filename):
 
 
 if __name__ == "__main__":
-    record_dir = r'C:\Users\diopndey\Documents\projet de synthese\Data\Retranscriptions_anonymes/' # A modifier avec le dossier où se trouvent les enregistrements .docx
+    record_dir = r'C:\Users\Awa Diop\Documents\E4 Eseo\Retranscriptions Anonymes_FINAL/' # A modifier avec le dossier où se trouvent les enregistrements .docx
     nlp = spacy.load("fr_core_news_lg")
 
     filenames = os.listdir(record_dir)
