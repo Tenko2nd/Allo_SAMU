@@ -20,7 +20,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import LogisticRegression, RidgeClassifier, Ridge
 
 from tqdm import tqdm
-from xgboost import XGBClassifier
+# from xgboost import XGBClassifier
 
 def plot_prediction_distribution(test_data, y_proba, threshold=0.5):
     """
@@ -135,13 +135,13 @@ def train_model(json_file, model_name, seed, threshold = 0.5):
         model = RandomForestClassifier(n_estimators=100,
                                        max_depth=100,
                                        random_state=seed)
-    elif model_name == "XGBoost":
-        model = XGBClassifier(booster="gbtree",
-                              device = "cuda",
-                              learning_rate = 0.05,
-                              max_depth = 10,
-                              eval_metric='logloss',
-                              random_state=seed)
+    # elif model_name == "XGBoost":
+    #     model = XGBClassifier(booster="gbtree",
+    #                           device = "cuda",
+    #                           learning_rate = 0.05,
+    #                           max_depth = 10,
+    #                           eval_metric='logloss',
+    #                           random_state=seed)
     elif model_name == "Naive Bayes":
         model = GaussianNB()
 
@@ -177,45 +177,45 @@ def train_model(json_file, model_name, seed, threshold = 0.5):
 
     # ----- TOUS LES PLOTS ---------
 
-    # plot_prediction_distribution(test_data, y_proba_1, threshold=0.5)
-    #
-    #
-    # cm = confusion_matrix(Y_test, Y_pred)
-    # classes = ['Non STEMI', 'STEMI']
-    # fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    #
-    # sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges',
-    #             xticklabels=classes, yticklabels=classes, ax=axes[0], annot_kws={"size": 14}, vmin=0)
-    # axes[0].set_title(f"Matrice de confusion ({model_name})", fontsize=14)
-    # axes[0].set_xlabel("Prédiction", fontsize=12)
-    # axes[0].set_ylabel("Vérité terrain", fontsize=12)
-    #
-    # text_before = (f"Sensibilité (TP / (TP + FN)) : {score:.2f}"
-    #                f"\nSpécificité (TN / (TN + FP)) : {specificity:.2f}"
-    #                 f"\nPrécision (TP / (TP + FP)) : {precision:.2f}"
-    #                f"\nF1 Score : {f1:.2f}")
-    # # Affiche les scores sous la matrice de confusion
-    # axes[0].text(0.5, -0.15, text_before, fontsize=12, ha='center', va='top', transform=axes[0].transAxes)
-    #
-    # axes[1].plot(fpr_test, tpr_test, color='darkorange', lw=2, label=f'AUC = {roc_auc:.2f}')
-    # axes[1].plot([0, 1], [0, 1], linestyle='--', color='gray', label='Classifieur aléatoire')
-    # axes[1].set_title(f"Courbe ROC ({model_name})", fontsize=14)
-    # axes[1].set_xlabel("Taux de Faux Positifs", fontsize=12)
-    # axes[1].set_ylabel("Taux de Vrais Positifs", fontsize=12)
-    # axes[1].legend(loc="lower right")
-    # axes[1].grid(True)
-    #
-    # plt.show()
-    #
-    # plt.savefig(plot_path)
+    plot_prediction_distribution(test_data, y_proba_1, threshold=0.5)
+
+
+    cm = confusion_matrix(Y_test, Y_pred)
+    classes = ['Non STEMI', 'STEMI']
+    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges',
+                xticklabels=classes, yticklabels=classes, ax=axes[0], annot_kws={"size": 14}, vmin=0)
+    axes[0].set_title(f"Matrice de confusion ({model_name})", fontsize=14)
+    axes[0].set_xlabel("Prédiction", fontsize=12)
+    axes[0].set_ylabel("Vérité terrain", fontsize=12)
+
+    text_before = (f"Sensibilité (TP / (TP + FN)) : {score:.2f}"
+                   f"\nSpécificité (TN / (TN + FP)) : {specificity:.2f}"
+                    f"\nPrécision (TP / (TP + FP)) : {precision:.2f}"
+                   f"\nF1 Score : {f1:.2f}")
+    # Affiche les scores sous la matrice de confusion
+    axes[0].text(0.5, -0.15, text_before, fontsize=12, ha='center', va='top', transform=axes[0].transAxes)
+
+    axes[1].plot(fpr_test, tpr_test, color='darkorange', lw=2, label=f'AUC = {roc_auc:.2f}')
+    axes[1].plot([0, 1], [0, 1], linestyle='--', color='gray', label='Classifieur aléatoire')
+    axes[1].set_title(f"Courbe ROC ({model_name})", fontsize=14)
+    axes[1].set_xlabel("Taux de Faux Positifs", fontsize=12)
+    axes[1].set_ylabel("Taux de Vrais Positifs", fontsize=12)
+    axes[1].legend(loc="lower right")
+    axes[1].grid(True)
+
+    plt.show()
+
+    plt.savefig(plot_path)
 
     return int(score*100), int(specificity*100), int(precision*100), int(f1*100), int(roc_auc*100)
 
 
 if __name__ == "__main__":
 
-    classifiers = ["Ridge"]
-    data_file_fasstext_new = 'json_fasttext/new/json_sansmetadata.json'
+    classifiers = ["Random Forest"]
+    data_file_fasstext_new = r'D:\Projet_De_Synthese\JSON_TFIDF\json\json_\json_sansmetadata.json'
 
 
     csv_file = "result_tfidf_ridge.csv"
@@ -228,7 +228,7 @@ if __name__ == "__main__":
         writer = csv.writer(file)
 
         for classifier in classifiers:
-            for i in range (400):
+            for i in range (10):
                 seed = random.randint(1,10000)
                 recall, specificity, precision, f1, roc_auc = train_model(data_file_fasstext_new, classifier, seed)
                 writer.writerow([classifier, seed, recall, specificity, precision, f1, roc_auc])
