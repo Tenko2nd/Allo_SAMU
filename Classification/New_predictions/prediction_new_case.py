@@ -27,6 +27,6 @@ def predict_new_case(model_path, new_case_json, threshold=0.5):
 
 
 if __name__ == "__main__":
-    data_file = 'test.json'
-    model_path = "LR/flaubert_AS_05.json_LR_model_R87_S62_AUC83.joblib"
+    data_file = '../../Vectorization/BERT/test.json' # A changer pour un .json qui doit être nouvellement créé
+    model_path = "../Results/BERT/flaubert_AS_05.json_LR_model_R87_S62_AUC83.joblib" # Les .joblib se trouvent dans les Results > BERT > modèles testés
     predict_new_case(model_path, data_file)

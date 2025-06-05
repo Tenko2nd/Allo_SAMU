@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 
 # Plot la répartition des données en sortie pour savoir si elles sont "décisives" ou non
-def plot_prediction_line_by_id(agg_df, threshold=0.5, output_path_plot_line=None):  # Ajout du paramètre de sauvegarde
+def plot_prediction_line_by_id(agg_df, threshold=0.5, output_path_plot_line=None):
     if agg_df.empty:
         print("agg_df is empty in plot_prediction_line_by_id, skipping plot.")
         return
@@ -61,13 +61,13 @@ def extract_XY(dataset):
 
 def evaluate_segment(df_segment, segment_name, segment_value, output_dir_sub, json_file_name_prefix,
                      global_metrics_suffix, base_labels):
-    """
-    Évalue les performances sur un segment de données spécifique et sauvegarde la matrice de confusion.
-    """
+
+    # Évalue les performances sur un segment de données spécifique et sauvegarde la matrice de confusion.
+
     if df_segment.empty or len(df_segment) < 1:  # Ajout vérification < 1
         print(
             f"  Skipping evaluation for segment {segment_name}={segment_value}: DataFrame is empty or too small ({len(df_segment)}).")
-        return {}  # Retourner un dict vide si pas d'évaluation
+        return {}
 
     y_true = df_segment["true_label"]
     y_pred = df_segment["pred_label"]
@@ -78,12 +78,11 @@ def evaluate_segment(df_segment, segment_name, segment_value, output_dir_sub, js
 
     # Calcul des métriques
     accuracy = accuracy_score(y_true, y_pred)
-    recall = recall_score(y_true, y_pred, zero_division=0)  # Sensibilité
+    recall = recall_score(y_true, y_pred, zero_division=0)
 
     cm_segment = confusion_matrix(y_true, y_pred, labels=[0, 1])
 
     # Gérer le cas où cm_segment.ravel() ne retourne pas 4 valeurs (par exemple si une classe est totalement absente dans y_true ET y_pred pour ce segment)
-    # Ceci est une simplification, une gestion plus robuste pourrait être nécessaire pour les cas extrêmes.
     if cm_segment.shape == (2, 2) and cm_segment.size == 4:
         tn, fp, fn, tp = cm_segment.ravel()
     elif len(y_true.unique()) == 1:
@@ -100,9 +99,6 @@ def evaluate_segment(df_segment, segment_name, segment_value, output_dir_sub, js
             fn = (y_pred == 0).sum()
             tp = (y_pred == 1).sum()
     else:  # Cas où la matrice n'est pas 2x2, mais y_true est mixte (rare si y_true et y_pred sont binaires)
-        # On peut essayer de calculer directement. Attention si y_pred ne contient qu'une classe
-        # et que y_true est mixte. `confusion_matrix` devrait quand même retourner une matrice 2x2 avec labels=[0,1].
-        # Ce bloc est une précaution.
         tn = ((y_true == 0) & (y_pred == 0)).sum()
         fp = ((y_true == 0) & (y_pred == 1)).sum()
         fn = ((y_true == 1) & (y_pred == 0)).sum()
@@ -149,7 +145,7 @@ def evaluate_segment(df_segment, segment_name, segment_value, output_dir_sub, js
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
     safe_segment_value = str(segment_value).replace('<', 'lt_').replace('>', 'gt_').replace(' ', '_').replace('-',
-                                                                                                              '_')  # Ajout de remplacement pour '-'
+                                                                                                              '_')
     filename = f"{json_file_name_prefix}_CM_segment_{segment_name}_{safe_segment_value}_{global_metrics_suffix}.png"
     output_path = os.path.join(output_dir_sub, filename)
     try:
@@ -179,9 +175,9 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
         print(
             f"Warning for {json_file}: 'sexe' or 'age' key not found in the first data entry. Segmented analysis will be skipped.")
 
-    output_dir_name = {"SVM": "SVM", "Naive Bayes": "NB", "Logistic Regression": "LR",
-                       "Random Forest": "RF", "XGBoost": "XGBoost", "Ridge": "RidgeClassifier",
-                       "Catboost": "Catboost", "AdaBoost": "AdaBoost"}.get(model_name)
+    output_dir_name = {"SVM": "../../Results/BERT/SVM", "Naive Bayes": "../../Results/BERT/NB", "Logistic Regression": "../../Results/BERT/LR",
+                       "Random Forest": "../../Results/BERT/RF", "XGBoost": "../../Results/BERT/XGBoost", "Ridge": "../../Results/BERT/RidgeClassifier",
+                       "Catboost": "../../Results/BERT/Catboost", "AdaBoost": "../../Results/BERT/AdaBoost"}.get(model_name)
     if output_dir_name is None:
         print(f"ERROR: Model name {model_name} not recognized for output directory.")
         return 0, 0, 0, 0, 0, {}
@@ -191,13 +187,13 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
         id_cas_to_entries[entry["id_cas"]].append(entry)
 
     id_cas_to_target = {id_cas: entries[0]["target"] for id_cas, entries in id_cas_to_entries.items()}
-    # Extraire sexe et âge pour chaque id_cas, en supposant qu'ils sont constants par id_cas
+    # Extraire sexe et âge pour chaque id_cas
     id_cas_to_sex = {}
     id_cas_to_age = {}
     if has_sex_age_info:
         id_cas_to_sex = {id_cas: entries[0].get("sexe", "N/A") for id_cas, entries in id_cas_to_entries.items()}
         id_cas_to_age = {id_cas: entries[0].get("age", np.nan) for id_cas, entries in
-                         id_cas_to_entries.items()}  # Utiliser np.nan si age est manquant
+                         id_cas_to_entries.items()}  # Utiliser np.nan si age est manquant (normalement non)
 
     ids_0 = [id_cas for id_cas, t in id_cas_to_target.items() if t == 0]
     ids_1 = [id_cas for id_cas, t in id_cas_to_target.items() if t == 1]
@@ -217,23 +213,11 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
     np.random.shuffle(balanced_ids)
     id_targets = [id_cas_to_target[i] for i in balanced_ids]
 
-    # Ajustement pour test_size minimal pour la stratification
-    # n_splits pour train_test_split est 2 (train, test). Il faut au moins test_size * N >= n_classes
-    # et (1-test_size) * N >= n_classes pour stratify.
-    # Si test_size=0.15, il faut au moins ceil(2/0.15) = 14 échantillons au total pour espérer avoir 2 classes dans test.
-    # Et ceil(2 / (1-0.15)) = 3 pour train. Donc le total est le max, soit 14.
-    # Puisque nous avons n_balanced par classe, il nous faut n_balanced >= 2.
     min_samples_per_class_for_stratify = 2
     if n_balanced < min_samples_per_class_for_stratify:
         print(
             f"Warning for seed {seed}: n_balanced per class ({n_balanced}) is less than {min_samples_per_class_for_stratify}. Stratified split might fail or be uninformative. Skipping.")
         return 0, 0, 0, 0, 0, {}
-
-    # Alternative: si len(balanced_ids) est trop petit, stratify peut échouer.
-    # train_test_split exige au moins 1 échantillon par classe dans le set de test si stratify est utilisé.
-    # Et le nombre d'échantillons dans chaque classe doit être > au nombre de splits (ici 1 pour test).
-    # Donc, chaque classe dans `id_targets` doit avoir au moins 2 membres si `test_size` n'est pas trop grand.
-    # Notre équilibrage `n_balanced` garantit cela si `n_balanced >= 1`. Le test `n_balanced < min_samples_per_class_for_stratify` (avec 2) couvre cela.
 
     try:
         ids_train, ids_test = train_test_split(balanced_ids, test_size=0.15, stratify=id_targets, random_state=seed)
@@ -264,7 +248,6 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
     if len(np.unique(Y_test)) < 2:
         print(
             f"Warning for seed {seed}: Y_test has only one class: {np.unique(Y_test)}. Metrics 'before' might be ill-defined. Skipping some evaluations.")
-        # Ne pas skipper tout, mais certaines métriques comme ROC AUC avant agg. seront affectées.
 
     # Entraînement du modèle
     if model_name == "SVM":
@@ -295,15 +278,12 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
         scores = model.decision_function(X_test)
         if scores.ndim == 1:
             proba_pos = expit(scores); Y_proba_all = np.column_stack([1 - proba_pos, proba_pos])
-        else:  # Pour multiclasse, non pertinent ici mais pour la forme
-            proba_pos = expit(scores[:, 1] - scores[:, 0]);
-            Y_proba_all = np.column_stack([1 - proba_pos, proba_pos])  # Simple diff pour binaire
     elif hasattr(model, "predict_proba"):
         Y_proba_all = model.predict_proba(X_test)
     else:  # Cas comme RidgeClassifier sans predict_proba natif
         Y_proba_all = np.zeros((len(Y_test), 2))
-        Y_proba_all[:, 0] = 1 - Y_pred_before  # Ceci est une approximation grossière de la proba
-        Y_proba_all[:, 1] = Y_pred_before  # Ne pas utiliser pour ROC si possible
+        Y_proba_all[:, 0] = 1 - Y_pred_before
+        Y_proba_all[:, 1] = Y_pred_before
 
     Y_proba_before = Y_proba_all[:, 1]
 
@@ -314,25 +294,24 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
     f1_before = 0.0
     cm_before_heatmap = np.zeros((2, 2), dtype=int)
 
-    if len(np.unique(Y_test)) >= 1:  # On peut calculer la CM même avec une seule classe (pour voir les erreurs)
+    if len(np.unique(Y_test)) >= 1:
         cm_before_values = confusion_matrix(Y_test, Y_pred_before, labels=[0, 1]).ravel()
         if cm_before_values.size == 4:
             tn_b, fp_b, fn_b, tp_b = cm_before_values
             recall_before = tp_b / (tp_b + fn_b) if (tp_b + fn_b) > 0 else 0.0
             precision_before = tp_b / (tp_b + fp_b) if (tp_b + fp_b) > 0 else 0.0
             specificity_before = tn_b / (tn_b + fp_b) if (tn_b + fp_b) > 0 else 0.0
-            f1_before = 2 * (precision_before * recall_before) / (precision_before + recall_before) if (
-                                                                                                                   precision_before + recall_before) > 0 else 0.0
+            f1_before = 2 * (precision_before * recall_before) / (precision_before + recall_before) if (precision_before + recall_before) > 0 else 0.0
             cm_before_heatmap = confusion_matrix(Y_test, Y_pred_before, labels=[0, 1])
         else:  # Devrait pas arriver avec labels=[0,1]
             print(f"Warning for seed {seed}: Confusion matrix 'before' not 2x2.")
 
     # *********************** TEST AVEC AGGREGATION PAR ID ******************************
-    id_cas_test_embeddings = [entry["id_cas"] for entry in test_data]  # Renommé pour clarté
+    id_cas_test_embeddings = [entry["id_cas"] for entry in test_data]
 
     df_test_agg_data = {
         "id_cas": id_cas_test_embeddings,
-        "true_label": Y_test,  # Utiliser Y_test directement car il correspond à X_test
+        "true_label": Y_test,
         "proba": Y_proba_before
     }
     # Ajouter sexe et age si disponibles, en mappant depuis id_cas
@@ -364,7 +343,7 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
     total_cases_aggregated = len(agg_df)
     ambiguous_mask = agg_df["proba"].between(0.45, 0.55)  # Seuil d'ambiguïté
     nb_removed_ambiguous = ambiguous_mask.sum()
-    agg_df_filtered = agg_df[~ambiguous_mask].copy()  # Utiliser .copy() pour éviter SettingWithCopyWarning
+    agg_df_filtered = agg_df[~ambiguous_mask].copy()  # .copy() pour éviter SettingWithCopyWarning
     nb_kept_for_metrics = len(agg_df_filtered)
 
     recall_after = 0.0;
@@ -385,8 +364,7 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
             recall_after = tp_agg / (tp_agg + fn_agg) if (tp_agg + fn_agg) > 0 else 0.0
             specificity_after = tn_agg / (tn_agg + fp_agg) if (tn_agg + fp_agg) > 0 else 0.0
             precision_after = tp_agg / (tp_agg + fp_agg) if (tp_agg + fp_agg) > 0 else 0.0
-            f1_after = 2 * (precision_after * recall_after) / (precision_after + recall_after) if (
-                                                                                                              precision_after + recall_after) > 0 else 0.0
+            f1_after = 2 * (precision_after * recall_after) / (precision_after + recall_after) if (precision_after + recall_after) > 0 else 0.0
 
         if len(y_true_filtered.unique()) < 2:
             print(
@@ -440,7 +418,7 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
                                output_path_plot_line=output_path_plot_line)  # Appel avec sauvegarde
 
     labels_cm = ['Non STEMI', 'STEMI']
-    fig_cm, axes_cm = plt.subplots(1, 2, figsize=(14, 7))  # Augmenté un peu la hauteur
+    fig_cm, axes_cm = plt.subplots(1, 2, figsize=(14, 7))
     sns.heatmap(cm_before_heatmap, annot=True, fmt='d', cmap='Oranges', xticklabels=labels_cm, yticklabels=labels_cm,
                 ax=axes_cm[0], annot_kws={"size": 14}, vmin=0)
     axes_cm[0].set_title("Avant agrégation");
@@ -449,7 +427,7 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
     text_before_metrics = (
         f"Sensibilité: {recall_before:.2f}\nSpécificité: {specificity_before:.2f}\nPrécision: {precision_before:.2f}\nF1 Score: {f1_before:.2f}")
     axes_cm[0].text(0.5, -0.28, text_before_metrics, fontsize=11, ha='center', va='top',
-                    transform=axes_cm[0].transAxes)  # Ajusté y
+                    transform=axes_cm[0].transAxes)
 
     sns.heatmap(cm_after_heatmap, annot=True, fmt='d', cmap='Purples', xticklabels=labels_cm, yticklabels=labels_cm,
                 ax=axes_cm[1], annot_kws={"size": 14}, vmin=0)
@@ -459,14 +437,14 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
     text_after_metrics = (
         f"Sur {total_cases_aggregated} cas agrégés:\n  - Cas ambigus (0.45-0.55) retirés: {nb_removed_ambiguous}\n  - Cas conservés pour métriques: {nb_kept_for_metrics}\n\nMétriques sur cas conservés:\nSensibilité: {recall_after:.2f}\nSpécificité: {specificity_after:.2f}\nPrécision: {precision_after:.2f}\nF1 Score: {f1_after:.2f}")
     axes_cm[1].text(0.5, -0.28, text_after_metrics, fontsize=11, ha='center', va='top',
-                    transform=axes_cm[1].transAxes)  # Ajusté y
+                    transform=axes_cm[1].transAxes)
 
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])  # Ajusté pour titre et textes
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     output_path_matrix = os.path.join(output_dir_sub, f"{json_file}_confusion_matrix_{list_metrics_suffix}.png")
     plt.savefig(output_path_matrix, dpi=300);
     plt.close()
 
-    # ----- NOUVELLE SECTION : ÉVALUATION PAR SEGMENT -----
+    # *********** ÉVALUATION PAR SEGMENT *************
     segmented_metrics_results = {}  # Pour stocker les métriques par segment
     if has_sex_age_info and not agg_df_filtered.empty:
 
@@ -513,10 +491,12 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
     df_for_csv_aggregated.rename(
         columns={"proba": "proba_1_agg", "true_label": "true_label_cas", "pred_label": "pred_label_cas"}, inplace=True)
     df_for_csv_aggregated["proba_0_agg"] = 1 - df_for_csv_aggregated["proba_1_agg"]
+
     # Réorganiser les colonnes pour la lisibilité
     cols_order = ["id_cas", "true_label_cas", "proba_0_agg", "proba_1_agg", "pred_label_cas"]
     if has_sex_age_info and "sexe" in df_for_csv_aggregated.columns: cols_order.append("sexe")
     if has_sex_age_info and "age" in df_for_csv_aggregated.columns: cols_order.append("age")
+
     # S'assurer que toutes les colonnes existent avant de réindexer
     cols_order = [col for col in cols_order if col in df_for_csv_aggregated.columns]
     df_for_csv_aggregated = df_for_csv_aggregated[cols_order]
@@ -531,22 +511,19 @@ def classifier_training(json_rep, json_file, model_name, seed, agg='median', thr
 
     return (int(recall_after * 100), int(specificity_after * 100),
             int(precision_after * 100), int(f1_after * 100),
-            int(roc_auc_agg * 100), segmented_metrics_results)  # Retourner aussi les métriques segmentées
+            int(roc_auc_agg * 100), segmented_metrics_results)
 
 
 if __name__ == "__main__":
     models = ["Naive Bayes", "Random Forest", "Ridge"]
     json_reps = {
-        r"D:\Projet_De_Synthese\JSON_BERT\jsons_non_normaliser_add\add_nn_camembertav2-base_nlp_json": "camembertav2-base_sans_metadata_3",
-        r"D:\Projet_De_Synthese\JSON_BERT\jsons_non_normaliser_add\add_nn_flaubert_large_cased_nlp_json": "flaubert_large_cased_sans_metadata_3",
-    }
-    main_csv_file = "result_global_metrics_non_normalises_Vf.csv"  # Mis à jour le nom du fichier
+        r"../../../Vectorization/Results/BERT/nn_camembertav2-base_nlp_json": "camembertav2-base_sans_metadata_3"}
+    main_csv_file = "../../Results/BERT/result_bert.csv"
 
-    # Définir les métriques que vous voulez pour chaque segment
-    # AJOUT DE "n_cases" ICI
+    # Définition les métriques pour chaque segment
     segment_metric_keys = ["accuracy", "recall", "specificity", "precision", "f1", "auc", "n_cases"]
 
-    # Construire les noms des colonnes pour le CSV dynamiquement
+    # Construction des noms des colonnes pour le CSV final
     header_row = ["model", "json_rep_path", "json_file_key", "seed",
                   "sensibility", "specificity", "precision", "f1_score", "auc_roc"]
 
@@ -570,7 +547,7 @@ if __name__ == "__main__":
             for json_rep_path, json_file_key in json_reps.items():
                 print(f"Treating '{json_file_key}' from '{json_rep_path}' with model '{model_name_loop}'")
                 success_count = 0
-                for i in tqdm(range(200), desc=f"{model_name_loop} - {json_file_key}"):
+                for i in tqdm(range(70), desc=f"{model_name_loop} - {json_file_key}"): # 70 tests
                     seed = random.randint(1, 100000)
                     sens, spe, pre, f1, roc, segmented_metrics = classifier_training(
                         json_rep_path, json_file_key, model_name_loop, seed, agg='median'
@@ -583,7 +560,6 @@ if __name__ == "__main__":
                             segment_data = segmented_metrics.get(f"sexe_{sex_val}", {})
                             for metric_key in segment_metric_keys:
                                 value = segment_data.get(metric_key, np.nan)
-                                # Pour n_cases, pas besoin de multiplier par 100
                                 if metric_key == "n_cases":
                                     row_data.append(int(value) if pd.notna(value) else np.nan)
                                 else:
@@ -593,7 +569,6 @@ if __name__ == "__main__":
                             segment_data = segmented_metrics.get(f"age_{age_key_suffix}", {})
                             for metric_key in segment_metric_keys:
                                 value = segment_data.get(metric_key, np.nan)
-                                # Pour n_cases, pas besoin de multiplier par 100
                                 if metric_key == "n_cases":
                                     row_data.append(int(value) if pd.notna(value) else np.nan)
                                 else:

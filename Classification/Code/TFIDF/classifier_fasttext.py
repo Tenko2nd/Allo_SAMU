@@ -1,28 +1,73 @@
 import csv
 import os
-from collections import Counter
-
 import seaborn as sns
 import pandas as pd
-from scipy.special import expit
-from sklearn.model_selection import train_test_split
-from sklearn.svm import SVC
 from sklearn.metrics import classification_report, recall_score, confusion_matrix, f1_score, roc_auc_score, \
     RocCurveDisplay, roc_curve
 import json
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 import random
-from sklearn.naive_bayes import GaussianNB
 
-from sklearn.linear_model import LogisticRegression, RidgeClassifier, Ridge
+from sklearn.metrics import ConfusionMatrixDisplay
 
-from tqdm import tqdm
-# from xgboost import XGBClassifier
+def plot_filtered_confusions(test_data, Y_test, Y_proba, Y_pred):
+    def compute_metrics(y_true, y_pred):
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+        sens = tp / (tp + fn) if (tp + fn) != 0 else 0
+        spec = tn / (tn + fp) if (tn + fp) != 0 else 0
+        prec = tp / (tp + fp) if (tp + fp) != 0 else 0
+        f1 = f1_score(y_true, y_pred)
+        return sens, spec, prec, f1
 
-def plot_prediction_distribution(test_data, y_proba, threshold=0.5):
+    def make_plot(indices, title, ax, cmap):
+        if len(indices) == 0:
+            ax.set_title(f"{title} (Aucun cas)")
+            ax.axis('off')
+            return
+
+        y_true = Y_test[indices]
+        y_pred = Y_pred[indices]
+        cm = confusion_matrix(y_true, y_pred)
+
+        sns.heatmap(cm, annot=True, fmt='d', cmap=cmap,
+                    xticklabels=['Non STEMI', 'STEMI'],
+                    yticklabels=['Non STEMI', 'STEMI'], ax=ax, annot_kws={"size": 14})
+        sens, spec, prec, f1 = compute_metrics(y_true, y_pred)
+
+        ax.set_title(title, fontsize=14)
+        ax.set_xlabel("Prédiction", fontsize=12)
+        ax.set_ylabel("Vérité terrain", fontsize=12)
+        metrics_text = (
+            f"Sensibilité : {sens:.2f}\n"
+            f"Spécificité : {spec:.2f}\n"
+            f"Précision : {prec:.2f}\n"
+            f"F1 Score : {f1:.2f}"
+        )
+        ax.text(0.5, -0.25, metrics_text, fontsize=12, ha='center', va='top', transform=ax.transAxes)
+
+    # Création des filtres
+    sexe = np.array([entry["sexe"].lower() for entry in test_data])
+    age = np.array([entry["age"] for entry in test_data])
+
+    categories = [
+        ("Hommes", np.where(sexe == "m")[0], "Blues"),
+        ("Femmes", np.where(sexe == "f")[0], "Reds"),
+        ("Âge < 40", np.where(age < 40)[0], "Purples"),
+        ("Âge 40-60", np.where((age >= 40) & (age <= 60))[0], "Greens"),
+        ("Âge > 60", np.where(age > 60)[0], "Oranges"),
+    ]
+
+    fig, axes = plt.subplots(1, 5, figsize=(25, 6))
+    for i, (title, indices, cmap) in enumerate(categories):
+        make_plot(indices, title, axes[i], cmap)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_prediction_distribution(test_data, y_proba, threshold=0.55):
     """
     Affiche une droite avec la répartition des probabilités prédites (classe 1) pour chaque id_cas.
     Points rouges = vraie classe 1, points bleus = vraie classe 0
@@ -50,7 +95,7 @@ def plot_prediction_distribution(test_data, y_proba, threshold=0.5):
     plt.xlim(0, 1)
     plt.legend()
     plt.tight_layout()
-    plt.subplots_adjust(bottom=0.25)  # Laisse plus de place en bas
+    plt.subplots_adjust(bottom=0.25)
 
     plt.show()
 
@@ -94,22 +139,14 @@ def prepare_arrays(data):
     return X, y
 
 
-def train_model(json_file, model_name, seed, threshold = 0.5):
+def train_model(json_file, model_name, seed, threshold = 0.55):
 
-    # --------------- ENREGISTREMNT DES RESULTATS -------------------------
+    # *************** ENREGISTREMNT DES RESULTATS *****************
     output_dir = None
-    if model_name == "SVM":
-        output_dir = "SVM"
-    elif model_name == "Logistic Regression":
-        output_dir = "LR"
-    elif model_name == "Random Forest":
-        output_dir = "RF"
-    elif model_name == "XGBoost":
-        output_dir = "XGBoost"
-    elif model_name == "Naive Bayes":
-        output_dir = "NB"
-    elif model_name == "Ridge":
-        output_dir = "Ridge"
+
+    # Le code a été simplifié pour uniquement être fait sur le Random Forest mais marche pareil sur tous les autres modèles
+    if model_name == "Random Forest":
+        output_dir = "../../Results/TFIDF/RF"
 
     os.makedirs(output_dir, exist_ok=True)
     plot_path = os.path.join(output_dir, f"roc_confusion_{model_name.replace(' ', '_')}.png")
@@ -121,49 +158,23 @@ def train_model(json_file, model_name, seed, threshold = 0.5):
     X_train, y_train = prepare_arrays(train_data)
     X_test, Y_test = prepare_arrays(test_data)
 
-    # Choix du modèle
-    if model_name == "SVM":
-        model = SVC(kernel='linear',
-                    probability=True,
-                    random_state=seed)
-    elif model_name == "Logistic Regression":
-        model = LogisticRegression(random_state=seed,
-                                   max_iter=1000,
-                                   class_weight="balanced",
-                                   solver="liblinear")
-    elif model_name == "Random Forest":
+    if model_name == "Random Forest":
         model = RandomForestClassifier(n_estimators=100,
                                        max_depth=100,
                                        random_state=seed)
-    # elif model_name == "XGBoost":
-    #     model = XGBClassifier(booster="gbtree",
-    #                           device = "cuda",
-    #                           learning_rate = 0.05,
-    #                           max_depth = 10,
-    #                           eval_metric='logloss',
-    #                           random_state=seed)
-    elif model_name == "Naive Bayes":
-        model = GaussianNB()
 
 
-    elif model_name == "Ridge":
-        model = RidgeClassifier(random_state=seed)
 
     model.fit(X_train, y_train)
 
-    Y_pred = model.predict(X_test)
-    if model_name == "Ridge":
-        scores = model.decision_function(X_test)
-        proba_pos = expit(scores)
-        proba_neg = 1 - proba_pos
-        Y_proba_all = np.column_stack([proba_neg, proba_pos])  # shape: (n_samples, 2)
-    else:
-        Y_proba_all = model.predict_proba(X_test)
+
+    Y_proba_all = model.predict_proba(X_test)
 
     Y_proba = Y_proba_all[:, 1]
     Y_pred = (Y_proba >= threshold).astype(int)
     y_proba_1 = [proba[1] for proba in Y_proba_all]
-    # ---------- Evaluation ----------------------
+
+    # ****************** Evaluation *****************
 
     score = recall_score(Y_test, Y_pred)
     report = classification_report(Y_test, Y_pred)
@@ -175,7 +186,7 @@ def train_model(json_file, model_name, seed, threshold = 0.5):
     fpr_test, tpr_test, _ = roc_curve(Y_test, Y_proba)
 
 
-    # ----- TOUS LES PLOTS ---------
+    # *************** TOUS LES PLOTS ******************
 
     plot_prediction_distribution(test_data, y_proba_1, threshold=0.5)
 
@@ -205,9 +216,14 @@ def train_model(json_file, model_name, seed, threshold = 0.5):
     axes[1].legend(loc="lower right")
     axes[1].grid(True)
 
+    plt.tight_layout()
+    plt.subplots_adjust(bottom=0.25)
     plt.show()
 
     plt.savefig(plot_path)
+
+    plot_filtered_confusions(test_data, Y_test, Y_proba, Y_pred)
+
 
     return int(score*100), int(specificity*100), int(precision*100), int(f1*100), int(roc_auc*100)
 
@@ -215,10 +231,9 @@ def train_model(json_file, model_name, seed, threshold = 0.5):
 if __name__ == "__main__":
 
     classifiers = ["Random Forest"]
-    data_file_fasstext_new = r'D:\Projet_De_Synthese\JSON_TFIDF\json\json_\json_sansmetadata.json'
+    data_file_fasstext_new = '../../../Vectorization/Results/TFIDF/json_sansmedatada.json'
 
-
-    csv_file = "result_tfidf_ridge.csv"
+    csv_file = "../../Results/TFIDF/results_tfidf.csv"
 
     with open(csv_file, mode='w', newline='') as file:
         writer = csv.writer(file)
@@ -228,7 +243,7 @@ if __name__ == "__main__":
         writer = csv.writer(file)
 
         for classifier in classifiers:
-            for i in range (10):
+            for i in range (200):
                 seed = random.randint(1,10000)
                 recall, specificity, precision, f1, roc_auc = train_model(data_file_fasstext_new, classifier, seed)
                 writer.writerow([classifier, seed, recall, specificity, precision, f1, roc_auc])
