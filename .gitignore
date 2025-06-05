@@ -2,7 +2,6 @@
 data-bert/
 data/
 *.png
-*.csv
 *.joblib
 *.json
 classifier/SVM/
