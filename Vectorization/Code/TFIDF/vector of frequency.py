@@ -9,7 +9,7 @@ def charger_dictionnaire(chemin):
         mots = [mot.strip() for mot in f.readlines() if mot.strip()]
         return list(OrderedDict.fromkeys(mots))  # Supprimer les doublons
 
-dictionnaire = charger_dictionnaire("dictionnaire_medicaux_300.txt")
+dictionnaire = charger_dictionnaire("dictionnaire_medicaux.txt")
 
 # === 2. Dossier contenant les fichiers texte ===
 data_folder = "data"
