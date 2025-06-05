@@ -7,10 +7,10 @@ def docx_to_list(record_ID, record_dir):
     doc = docx.Document(record_dir + record_ID)
 
     # Ouvre les stopwords et caractères spéciaux
-    stopwordsPath = r"Ressources\stopwords-fr.txt"
+    stopwordsPath = "../../Ressources/stopwords-fr.txt"
     with open(stopwordsPath, 'r', encoding='utf-8') as f:
         stopwords = set(line.strip() for line in f)
-    caracterePath = r"Ressources\caracteres_speciaux.txt"
+    caracterePath = "../../Ressources/caracteres_speciaux.txt"
     with open(caracterePath, 'r', encoding='utf-8') as f:
         caracteres = set(line.strip() for line in f)
 
@@ -54,7 +54,8 @@ def clean_and_lemmatize(text, caracteres, stopwords, nlp):
 
 
 def final_words(all_text, caracteres, stopwords, nlp, filename):
-    data_path = "data"
+    data_path = "../../Results/TFIDF"
+    os.makedirs(data_path, exist_ok=True)
     os.makedirs(data_path, exist_ok=True)
     cleaned_lemmas = []
     for paragraph in all_text:
@@ -71,16 +72,12 @@ def final_words(all_text, caracteres, stopwords, nlp, filename):
             outfile.write(lemma + " ")
             is_first_lemma = False
 
-    """
-    Dans le dossier "data_bert" on trouvera tous les enregistrements .txt (ayant le même nom que les fichiers d'origine .docx),
-    en plus simplifié (uniquement en minuscule, sans l'en-tête, + lemmatisation + suppression des stopwords et de la ponctuation).
-    """
 
     return cleaned_lemmas
 
 
 if __name__ == "__main__":
-    record_dir = r'C:\Users\maeva\Document\ESEO\E4\S2\Projet_synthese\record/' # A modifier avec le dossier où se trouvent les enregistrements .docx
+    record_dir = '../../../Data/' # Dossier où se trouvent les enregistrements .docx
     nlp = spacy.load("fr_core_news_lg")
 
     filenames = os.listdir(record_dir)
